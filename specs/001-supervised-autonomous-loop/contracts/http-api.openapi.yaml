@@ -1,0 +1,1059 @@
+openapi: 3.1.0
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+info:
+  title: Moonshift Supervised Autonomous Loop API
+  version: 1.0.0-planned
+  description: >-
+    Loopback-only Iteration 0 contract for the single supervisor. This is a planning artifact,
+    not a shipped or supported API.
+servers:
+  - url: http://127.0.0.1:{port}
+    description: Local evaluation control plane
+    variables:
+      port:
+        default: "4310"
+security:
+  - LocalSupervisorSession: []
+tags:
+  - name: System
+  - name: Session
+  - name: Projects
+  - name: Controls
+  - name: Approvals
+  - name: Results
+paths:
+  /v1/health:
+    get:
+      tags: [System]
+      operationId: getHealth
+      security: []
+      responses:
+        "200":
+          description: Process is alive; this does not imply dependency readiness.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [status, version]
+                properties:
+                  status:
+                    const: alive
+                  version:
+                    type: string
+  /v1/session/bootstrap:
+    post:
+      tags: [Session]
+      operationId: bootstrapSupervisorSession
+      security: []
+      summary: Exchange one short-lived, single-use owner-local bootstrap secret for a browser session.
+      description: >-
+        Available only on a loopback bind. The secret arrives from a browser URL fragment, is never
+        accepted in a query string, and is invalidated whether the exchange succeeds or fails.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [bootstrapSecret]
+              properties:
+                bootstrapSecret:
+                  type: string
+                  minLength: 43
+                  maxLength: 256
+      responses:
+        "204":
+          description: Session established; response body is empty.
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/SupervisorSessionCookie"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+  /v1/projects:
+    post:
+      tags: [Projects]
+      operationId: createProject
+      summary: Create one durable fixture project from a supervisor objective.
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProjectRequest"
+      responses:
+        "201":
+          description: Project created.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectView"
+        "200":
+          description: The idempotency key already created this project; the original result is returned.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectView"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/projects/{projectId}:
+    get:
+      tags: [Projects]
+      operationId: getProject
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Current durable project projection.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectView"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/projects/{projectId}/events:
+    get:
+      tags: [Projects]
+      operationId: streamProjectEvents
+      summary: Stream an at-least-once projection ordered by project sequence.
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: Last-Event-ID
+          in: header
+          required: false
+          description: Last completely processed project sequence as a decimal string.
+          schema:
+            type: string
+            pattern: "^[0-9]+$"
+      responses:
+        "200":
+          description: >-
+            Server-sent event stream. Each event id is the project sequence and each data field is a
+            Project Event Envelope from event-envelope.schema.json.
+          headers:
+            Cache-Control:
+              schema:
+                const: no-cache
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "409":
+          description: >-
+            Cursor is older than retained event history; reload ProjectView, including its complete
+            durable-source presence projection, before opening a new event stream.
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/Problem"
+                  - type: object
+                    properties:
+                      code:
+                        const: EVENT_CURSOR_EXPIRED
+  /v1/projects/{projectId}/commands/pause:
+    post:
+      tags: [Controls]
+      operationId: pauseProject
+      summary: Gracefully quiesce work at a checkpoint while preserving resumability.
+      description: >-
+        Valid for ACTIVE or BLOCKED projects. It prevents new leases immediately, lets an already
+        executing fixture effect reach a recorded ground-truth boundary, checkpoints other active
+        work, and converges through PAUSING to PAUSED. Pending approvals remain pending but cannot
+        authorize execution until resume revalidates them.
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        $ref: "#/components/requestBodies/ControlCommand"
+      responses:
+        "202":
+          $ref: "#/components/responses/CommandAccepted"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "412":
+          $ref: "#/components/responses/Problem"
+  /v1/projects/{projectId}/commands/resume:
+    post:
+      tags: [Controls]
+      operationId: resumeProject
+      summary: Resume a paused or stopped project under freshly validated authority.
+      description: >-
+        Valid for PAUSED or STOPPED projects. No prior capability or runner lease is revived. Policy,
+        budget, approval expiry, evidence revision, and effect ground truth are revalidated before a
+        successor execution may start from the latest valid checkpoint.
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        $ref: "#/components/requestBodies/ControlCommand"
+      responses:
+        "202":
+          $ref: "#/components/responses/CommandAccepted"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "412":
+          $ref: "#/components/responses/Problem"
+  /v1/projects/{projectId}/commands/stop:
+    post:
+      tags: [Controls]
+      operationId: stopProject
+      summary: Reach a recoverable stopped state after revoking active execution authority.
+      description: >-
+        Valid for ACTIVE, PAUSING, PAUSED, RESUMING, or BLOCKED. It prevents new work, cancels pending
+        approvals, revokes execution-scoped capabilities, fences runner leases, and reconciles an
+        already executing fixture effect before converging through STOPPING to STOPPED. It conflicts
+        for CREATING, STOPPING, STOPPED, CANCELLING, or terminal projects. A later resume creates fresh
+        authority and a successor execution; it never revives the stopped execution.
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        $ref: "#/components/requestBodies/ControlCommand"
+      responses:
+        "202":
+          $ref: "#/components/responses/CommandAccepted"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "412":
+          $ref: "#/components/responses/Problem"
+  /v1/projects/{projectId}/commands/cancel:
+    post:
+      tags: [Controls]
+      operationId: cancelProject
+      summary: Irreversibly cancel a project after effects reach known ground truth.
+      description: >-
+        Valid for CREATING, ACTIVE, PAUSING, PAUSED, RESUMING, STOPPING, STOPPED, or BLOCKED. It uses
+        the stop revocation and reconciliation boundary, then cancels unfinished tasks and converges
+        through CANCELLING to the terminal CANCELLED state. It conflicts for CANCELLING or any terminal
+        project, and resume is invalid. Aggregate version serialization decides races: completion
+        committed first makes cancel conflict; cancellation committed first rejects later completion.
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        $ref: "#/components/requestBodies/ControlCommand"
+      responses:
+        "202":
+          $ref: "#/components/responses/CommandAccepted"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "412":
+          $ref: "#/components/responses/Problem"
+  /v1/projects/{projectId}/approvals:
+    get:
+      tags: [Approvals]
+      operationId: listApprovals
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - name: state
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ApprovalState"
+      responses:
+        "200":
+          description: >-
+            Approval projections visible to the supervisor. Each item exposes its aggregate version;
+            retrieve the selected item to obtain the strong ETag required for a decision.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ApprovalView"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/projects/{projectId}/approvals/{approvalId}:
+    get:
+      tags: [Approvals]
+      operationId: getApproval
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/ApprovalId"
+      responses:
+        "200":
+          description: Current approval representation and strong aggregate-version validator.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalView"
+        "404":
+          $ref: "#/components/responses/Problem"
+  /v1/projects/{projectId}/approvals/{approvalId}/decision:
+    post:
+      tags: [Approvals]
+      operationId: decideApproval
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+        - $ref: "#/components/parameters/ApprovalId"
+        - $ref: "#/components/parameters/IdempotencyKey"
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApprovalDecisionRequest"
+      responses:
+        "200":
+          description: Approval terminal decision, including an idempotently returned prior result.
+          headers:
+            ETag:
+              $ref: "#/components/headers/ETag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApprovalView"
+        "409":
+          $ref: "#/components/responses/Problem"
+        "412":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+  /v1/projects/{projectId}/results:
+    get:
+      tags: [Results]
+      operationId: getProjectResults
+      parameters:
+        - $ref: "#/components/parameters/ProjectId"
+      responses:
+        "200":
+          description: Revision-bound result projection; non-verified work remains visibly non-verified.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ResultView"
+        "404":
+          $ref: "#/components/responses/Problem"
+components:
+  securitySchemes:
+    LocalSupervisorSession:
+      type: apiKey
+      in: cookie
+      name: moonshift_supervisor_session
+      description: >-
+        Opaque host-only HttpOnly SameSite=Strict loopback evaluation session. It is never a provider
+        credential and must not be exposed to JavaScript or logs.
+  parameters:
+    ProjectId:
+      name: projectId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ApprovalId:
+      name: approvalId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Stable semantic command identity; 16 to 128 visible ASCII characters.
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 128
+        pattern: "^[!-~]+$"
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: Strong ETag containing the aggregate version returned by the last query.
+      schema:
+        type: string
+        pattern: '^"[1-9][0-9]*"$'
+  headers:
+    ETag:
+      description: Strong aggregate-version ETag.
+      schema:
+        type: string
+        pattern: '^"[1-9][0-9]*"$'
+    SupervisorSessionCookie:
+      description: >-
+        Host-only loopback session cookie with HttpOnly, SameSite=Strict, and Path=/ attributes; its
+        opaque value must never be logged. Secure is additionally required when the loopback profile
+        is served over HTTPS.
+      schema:
+        type: string
+  requestBodies:
+    ControlCommand:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [reason]
+            properties:
+              reason:
+                type: string
+                minLength: 1
+                maxLength: 1000
+  responses:
+    CommandAccepted:
+      description: Command intent durably accepted; transition continues asynchronously.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/AcceptedCommand"
+    Problem:
+      description: Safe problem detail with no stack, credential, or private reasoning.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+  schemas:
+    CreateProjectRequest:
+      type: object
+      additionalProperties: false
+      required: [objective, fixtureScenario]
+      properties:
+        objective:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        fixtureScenario:
+          type: string
+          enum:
+            - PASS
+            - EVIDENCE_FAIL
+            - APPROVAL_REJECT
+            - INTERRUPT_BEFORE_EFFECT
+            - INTERRUPT_DURING_EFFECT
+            - INTERRUPT_AFTER_EFFECT
+    AcceptedCommand:
+      type: object
+      additionalProperties: false
+      required: [commandId, projectId, status, acceptedAt, correlationId]
+      properties:
+        commandId:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        status:
+          const: ACCEPTED
+        acceptedAt:
+          type: string
+          format: date-time
+        correlationId:
+          type: string
+          format: uuid
+    ProjectView:
+      type: object
+      additionalProperties: false
+      required: [projectId, objective, status, version, personas, specialists, presences, channels, tasks, dependencies, capacity, lastSequence]
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        objective:
+          type: string
+        status:
+          $ref: "#/components/schemas/ProjectState"
+        version:
+          type: integer
+          minimum: 1
+        personas:
+          type: array
+          description: >-
+            Complete persistent persona identities; temporary specialists are projected separately.
+            Policy limits ACTIVE personas to six while archived identities remain visible.
+          minItems: 3
+          items:
+            $ref: "#/components/schemas/AgentSummary"
+        specialists:
+          type: array
+          description: >-
+            Current and archived task-scoped specialist identities needed to rebuild the organization
+            view. Policy limits ACTIVE specialists to eight while archived identities remain visible.
+          items:
+            $ref: "#/components/schemas/AgentSummary"
+        presences:
+          type: array
+          description: >-
+            Complete current projection for every active persona and specialist, rebuilt from durable
+            records and leases rather than inferred from the event stream or a socket.
+          minItems: 3
+          maxItems: 14
+          items:
+            $ref: "#/components/schemas/PresenceView"
+        channels:
+          type: array
+          maxItems: 64
+          items:
+            $ref: "#/components/schemas/ChannelSummary"
+        tasks:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskSummary"
+        dependencies:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaskDependencySummary"
+        capacity:
+          $ref: "#/components/schemas/CapacityView"
+        lastSequence:
+          type: integer
+          minimum: 0
+    ProjectState:
+      type: string
+      enum:
+        - CREATING
+        - ACTIVE
+        - PAUSING
+        - PAUSED
+        - RESUMING
+        - STOPPING
+        - STOPPED
+        - CANCELLING
+        - COMPLETED
+        - BLOCKED
+        - FAILED
+        - CANCELLED
+    AgentSummary:
+      type: object
+      additionalProperties: false
+      required: [agentId, kind, role, status, lineageId]
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [PERSONA, SPECIALIST]
+        role:
+          type: string
+        status:
+          $ref: "#/components/schemas/AgentIdentityState"
+        lineageId:
+          type: string
+          format: uuid
+    AgentIdentityState:
+      type: string
+      description: Durable identity lifecycle state; runtime presence is represented separately.
+      enum: [CREATED, ACTIVE, PAUSED, DISABLED, COMPLETED, FAILED, ARCHIVED]
+    PresenceState:
+      type: string
+      enum:
+        - IDLE
+        - QUEUED
+        - THINKING_PROVIDER_CALL
+        - USING_TOOLS
+        - WAITING_FOR_RUNNER
+        - WAITING_FOR_AGENT
+        - WAITING_FOR_APPROVAL
+        - VERIFYING
+        - BLOCKED
+        - COMPLETED
+        - FAILED
+    PresenceView:
+      type: object
+      additionalProperties: false
+      required: [agentId, state, sourceType, sourceId, updatedAt, activity]
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        state:
+          $ref: "#/components/schemas/PresenceState"
+        sourceType:
+          type: string
+          enum: [IDENTITY, TASK, EXECUTION, TOOL_INVOCATION, APPROVAL, CAPACITY, VERIFICATION_EVALUATION]
+        sourceId:
+          type: string
+          format: uuid
+        updatedAt:
+          type: string
+          format: date-time
+        activity:
+          type: string
+          minLength: 1
+          maxLength: 240
+          description: Bounded observable activity only; never a prompt, transcript, or private reasoning.
+    ChannelSummary:
+      type: object
+      additionalProperties: false
+      required: [channelId, name, kind, depth, status]
+      properties:
+        channelId:
+          type: string
+          format: uuid
+        parentChannelId:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: "null"
+        name:
+          type: string
+        kind:
+          type: string
+          enum: [CATEGORY, CHANNEL, SUBCHANNEL]
+        depth:
+          type: integer
+          minimum: 0
+          maximum: 4
+        status:
+          type: string
+          enum: [ACTIVE, ARCHIVED]
+    TaskSummary:
+      type: object
+      additionalProperties: false
+      required: [taskId, title, state, expectedRevision]
+      properties:
+        taskId:
+          type: string
+          format: uuid
+        title:
+          type: string
+        state:
+          $ref: "#/components/schemas/TaskState"
+        assigneeAgentId:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: "null"
+        expectedRevision:
+          type: string
+          pattern: "^[a-f0-9]{40,64}$"
+    TaskDependencySummary:
+      type: object
+      additionalProperties: false
+      required: [taskDependencyId, predecessorTaskId, successorTaskId, kind]
+      properties:
+        taskDependencyId:
+          type: string
+          format: uuid
+        predecessorTaskId:
+          type: string
+          format: uuid
+        successorTaskId:
+          type: string
+          format: uuid
+        kind:
+          const: BLOCKS
+    TaskState:
+      type: string
+      enum:
+        - PROPOSED
+        - READY
+        - QUEUED
+        - RUNNING
+        - WAITING_FOR_AGENT
+        - WAITING_FOR_CAPACITY
+        - WAITING_FOR_APPROVAL
+        - BLOCKED
+        - CLAIMED_COMPLETE
+        - VERIFYING
+        - VERIFIED
+        - FAILED
+        - CANCELLED
+    ExecutionState:
+      type: string
+      enum:
+        - QUEUED
+        - STARTING
+        - RUNNING
+        - WAITING_FOR_APPROVAL
+        - CHECKPOINTING
+        - SUSPENDED
+        - STOPPING
+        - STOPPED
+        - SUCCEEDED
+        - FAILED
+        - CANCELLED
+        - LOST
+        - RECONCILING
+    CapacityView:
+      type: object
+      additionalProperties: false
+      required: [activeCognitiveRuns, cognitiveRunLimit, activeRunnerJobs, runnerJobLimit]
+      properties:
+        activeCognitiveRuns:
+          type: integer
+          minimum: 0
+        cognitiveRunLimit:
+          type: integer
+          minimum: 1
+          maximum: 5
+        activeRunnerJobs:
+          type: integer
+          minimum: 0
+        runnerJobLimit:
+          type: integer
+          const: 1
+    ApprovalState:
+      type: string
+      enum: [REQUESTED, APPROVED, REJECTED, EXPIRED, CANCELLED]
+    ApprovalView:
+      type: object
+      additionalProperties: false
+      required: [approvalId, projectId, taskId, requesterAgentId, state, actionDigest, scope, reason, riskSummary, expiresAt, version]
+      properties:
+        approvalId:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        taskId:
+          type: string
+          format: uuid
+        requesterAgentId:
+          type: string
+          format: uuid
+        state:
+          $ref: "#/components/schemas/ApprovalState"
+        actionDigest:
+          type: string
+          pattern: "^sha256:[a-f0-9]{64}$"
+        scope:
+          type: string
+        reason:
+          type: string
+        riskSummary:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        decidedAt:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: "null"
+        decisionActorId:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: "null"
+        version:
+          type: integer
+          minimum: 1
+    ApprovalDecisionRequest:
+      type: object
+      additionalProperties: false
+      required: [decision, actionDigest, reason]
+      properties:
+        decision:
+          type: string
+          enum: [APPROVE, REJECT]
+        actionDigest:
+          type: string
+          pattern: "^sha256:[a-f0-9]{64}$"
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+    ResultView:
+      type: object
+      additionalProperties: false
+      required: [projectId, projectState, task, artifacts, evidence, approvals, executions, checkpoints, effects, organizationLineage, audit, verified]
+      properties:
+        projectId:
+          type: string
+          format: uuid
+        projectState:
+          $ref: "#/components/schemas/ProjectState"
+        task:
+          $ref: "#/components/schemas/TaskSummary"
+        artifacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactView"
+        evidence:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvidenceView"
+        approvals:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApprovalView"
+        executions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExecutionView"
+        checkpoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/CheckpointView"
+        effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/EffectView"
+        organizationLineage:
+          $ref: "#/components/schemas/OrganizationLineageView"
+        audit:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEventView"
+        verified:
+          type: boolean
+    ArtifactView:
+      type: object
+      additionalProperties: false
+      required: [artifactId, projectId, taskId, executionId, kind, mediaType, size, contentHash, gitRevision]
+      properties:
+        artifactId:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        taskId:
+          type: string
+          format: uuid
+        executionId:
+          type: string
+          format: uuid
+        kind:
+          type: string
+        mediaType:
+          type: string
+        size:
+          type: integer
+          minimum: 0
+        contentHash:
+          type: string
+          pattern: "^sha256:[a-f0-9]{64}$"
+        gitRevision:
+          type: string
+          pattern: "^[a-f0-9]{40,64}$"
+    EvidenceView:
+      type: object
+      additionalProperties: false
+      required: [evidenceId, producerAgentId, type, status, observedAt, gitRevision, sourceHash]
+      properties:
+        evidenceId:
+          type: string
+          format: uuid
+        producerAgentId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [BUILD, TEST, INTEGRITY, COVERAGE, REVIEW, APPROVAL, RECONCILIATION]
+        status:
+          type: string
+          enum: [PASS, FAIL, MISSING, STALE, BLOCKING]
+        observedAt:
+          type: string
+          format: date-time
+        gitRevision:
+          type: string
+          pattern: "^[a-f0-9]{40,64}$"
+        sourceHash:
+          type: string
+          pattern: "^sha256:[a-f0-9]{64}$"
+    ExecutionView:
+      type: object
+      additionalProperties: false
+      required: [executionId, agentId, runtimeId, backendConnectionId, modelDescriptorId, modelDescriptorVersion, state, attemptNumber, startedAt]
+      properties:
+        executionId:
+          type: string
+          format: uuid
+        agentId:
+          type: string
+          format: uuid
+        runtimeId:
+          type: string
+          format: uuid
+        backendConnectionId:
+          type: string
+          format: uuid
+        modelDescriptorId:
+          type: string
+          format: uuid
+        modelDescriptorVersion:
+          type: integer
+          minimum: 1
+        state:
+          $ref: "#/components/schemas/ExecutionState"
+        attemptNumber:
+          type: integer
+          minimum: 1
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          oneOf:
+            - type: string
+              format: date-time
+            - type: "null"
+    CheckpointView:
+      type: object
+      additionalProperties: false
+      required: [checkpointId, executionId, schemaVersion, contentHash, gitRevision, createdAt]
+      properties:
+        checkpointId:
+          type: string
+          format: uuid
+        executionId:
+          type: string
+          format: uuid
+        schemaVersion:
+          type: string
+        contentHash:
+          type: string
+          pattern: "^sha256:[a-f0-9]{64}$"
+        gitRevision:
+          type: string
+          pattern: "^[a-f0-9]{40,64}$"
+        createdAt:
+          type: string
+          format: date-time
+    EffectView:
+      type: object
+      additionalProperties: false
+      required: [effectId, taskId, actionDigest, semanticKey, state]
+      properties:
+        effectId:
+          type: string
+          format: uuid
+        taskId:
+          type: string
+          format: uuid
+        actionDigest:
+          type: string
+          pattern: "^sha256:[a-f0-9]{64}$"
+        semanticKey:
+          type: string
+        state:
+          type: string
+          enum: [REQUESTED, EXECUTING, APPLIED, FAILED, UNKNOWN, RECONCILING, RECONCILED]
+        reconciliationOutcome:
+          oneOf:
+            - type: string
+            - type: "null"
+    OrganizationLineageView:
+      type: object
+      additionalProperties: false
+      required: [authorAgentId, authorLineageId, reviewerAgentId, reviewerLineageId, independentReview]
+      properties:
+        authorAgentId:
+          type: string
+          format: uuid
+        authorLineageId:
+          type: string
+          format: uuid
+        reviewerAgentId:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: "null"
+        reviewerLineageId:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: "null"
+        independentReview:
+          type: boolean
+    AuditEventView:
+      type: object
+      additionalProperties: false
+      required: [auditEventId, sequence, actorType, actorId, action, targetType, targetId, occurredAt, reason, outcome, correlationId]
+      properties:
+        auditEventId:
+          type: string
+          format: uuid
+        sequence:
+          type: integer
+          minimum: 1
+        actorType:
+          type: string
+          enum: [SUPERVISOR, PERSONA, SPECIALIST, RUNTIME, RUNNER, SYSTEM]
+        actorId:
+          type: string
+          format: uuid
+        action:
+          type: string
+        targetType:
+          type: string
+        targetId:
+          type: string
+          format: uuid
+        occurredAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        outcome:
+          type: string
+        correlationId:
+          type: string
+          format: uuid
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, code, correlationId]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 400
+          maximum: 599
+        code:
+          type: string
+          pattern: "^[A-Z][A-Z0-9_]+$"
+        detail:
+          type: string
+          maxLength: 2000
+        correlationId:
+          type: string
+          format: uuid

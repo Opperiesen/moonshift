@@ -1,0 +1,255 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moonshift.dev/schemas/v1/project-event.json",
+  "title": "Moonshift Project Event Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "eventId",
+    "projectId",
+    "sequence",
+    "kind",
+    "occurredAt",
+    "actor",
+    "aggregate",
+    "correlationId",
+    "classification",
+    "payload"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "eventId": { "$ref": "#/$defs/uuid" },
+    "projectId": { "$ref": "#/$defs/uuid" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "project.created",
+        "project.status_changed",
+        "channel.created",
+        "channel.archived",
+        "agent.created",
+        "agent.presence_changed",
+        "delegation.created",
+        "task.state_changed",
+        "execution.state_changed",
+        "backend.event_observed",
+        "tool.requested",
+        "policy.decided",
+        "approval.requested",
+        "approval.decided",
+        "effect.state_changed",
+        "artifact.published",
+        "evidence.recorded",
+        "verification.decided",
+        "checkpoint.created",
+        "reconciliation.completed",
+        "audit.notice"
+      ]
+    },
+    "occurredAt": { "type": "string", "format": "date-time" },
+    "actor": { "$ref": "#/$defs/actor" },
+    "aggregate": { "$ref": "#/$defs/aggregate" },
+    "correlationId": { "$ref": "#/$defs/uuid" },
+    "causationId": {
+      "oneOf": [
+        { "$ref": "#/$defs/uuid" },
+        { "type": "null" }
+      ]
+    },
+    "classification": {
+      "type": "string",
+      "enum": ["PUBLIC_FIXTURE", "INSTANCE_INTERNAL", "SENSITIVE_METADATA"]
+    },
+    "payload": {
+      "description": "Kind-specific allowlisted projection produced by the mandatory event sanitizer.",
+      "oneOf": [
+        { "$ref": "#/$defs/stateTransitionPayload" },
+        { "$ref": "#/$defs/referencePayload" },
+        { "$ref": "#/$defs/decisionPayload" },
+        { "$ref": "#/$defs/activityPayload" },
+        { "$ref": "#/$defs/noticePayload" }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "project.status_changed", "channel.archived", "agent.presence_changed",
+              "task.state_changed", "execution.state_changed", "effect.state_changed"
+            ]
+          }
+        },
+        "required": ["kind"]
+      },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/stateTransitionPayload" } } }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "project.created", "channel.created", "agent.created", "delegation.created",
+              "approval.requested", "artifact.published", "evidence.recorded", "checkpoint.created"
+            ]
+          }
+        },
+        "required": ["kind"]
+      },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/referencePayload" } } }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": ["policy.decided", "approval.decided", "verification.decided", "reconciliation.completed"]
+          }
+        },
+        "required": ["kind"]
+      },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/decisionPayload" } } }
+    },
+    {
+      "if": {
+        "properties": { "kind": { "enum": ["backend.event_observed", "tool.requested"] } },
+        "required": ["kind"]
+      },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/activityPayload" } } }
+    },
+    {
+      "if": {
+        "properties": { "kind": { "const": "audit.notice" } },
+        "required": ["kind"]
+      },
+      "then": { "properties": { "payload": { "$ref": "#/$defs/noticePayload" } } }
+    }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "actor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["SUPERVISOR", "PERSONA", "SPECIALIST", "SYSTEM"]
+        },
+        "id": { "$ref": "#/$defs/uuid" },
+        "lineageId": {
+          "oneOf": [
+            { "$ref": "#/$defs/uuid" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "aggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "id", "version"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "PROJECT",
+            "CHANNEL",
+            "AGENT",
+            "DELEGATION",
+            "TASK",
+            "EXECUTION",
+            "TOOL_INVOCATION",
+            "APPROVAL",
+            "EXTERNAL_EFFECT",
+            "ARTIFACT",
+            "EVIDENCE",
+            "CHECKPOINT"
+          ]
+        },
+        "id": { "$ref": "#/$defs/uuid" },
+        "version": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "safeText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^[^\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]*$"
+    },
+    "reasonCode": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{1,63}$"
+    },
+    "stateTransitionPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fromState", "toState", "reasonCode"],
+      "properties": {
+        "fromState": { "type": ["string", "null"], "maxLength": 64 },
+        "toState": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "reasonCode": { "$ref": "#/$defs/reasonCode" },
+        "summary": { "$ref": "#/$defs/safeText" }
+      }
+    },
+    "referencePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["referenceType", "referenceId", "summary"],
+      "properties": {
+        "referenceType": {
+          "type": "string",
+          "enum": ["PROJECT", "CHANNEL", "AGENT", "DELEGATION", "APPROVAL", "ARTIFACT", "EVIDENCE", "CHECKPOINT"]
+        },
+        "referenceId": { "$ref": "#/$defs/uuid" },
+        "contentHash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "summary": { "$ref": "#/$defs/safeText" }
+      }
+    },
+    "decisionPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "reasonCode", "summary"],
+      "properties": {
+        "decision": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,63}$" },
+        "reasonCode": { "$ref": "#/$defs/reasonCode" },
+        "summary": { "$ref": "#/$defs/safeText" },
+        "evidenceRefs": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/uuid" }
+        }
+      }
+    },
+    "activityPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["activity", "status", "summary"],
+      "properties": {
+        "activity": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,63}$" },
+        "status": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,63}$" },
+        "summary": { "$ref": "#/$defs/safeText" },
+        "referenceId": { "$ref": "#/$defs/uuid" },
+        "actionDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "progressPercent": { "type": "integer", "minimum": 0, "maximum": 100 }
+      }
+    },
+    "noticePayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "severity", "summary"],
+      "properties": {
+        "code": { "$ref": "#/$defs/reasonCode" },
+        "severity": { "type": "string", "enum": ["INFO", "WARNING", "ERROR"] },
+        "summary": { "$ref": "#/$defs/safeText" }
+      }
+    }
+  }
+}

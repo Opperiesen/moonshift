@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moonshift.dev/schemas/v1/execution-backend-message.json",
+  "title": "Moonshift Execution Backend Message",
+  "oneOf": [
+    { "$ref": "#/$defs/probeCommand" },
+    { "$ref": "#/$defs/startCommand" },
+    { "$ref": "#/$defs/cancelCommand" },
+    { "$ref": "#/$defs/resumeCommand" },
+    { "$ref": "#/$defs/backendEvent" }
+  ],
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "base": {
+      "type": "object",
+      "required": ["schemaVersion", "messageId", "kind", "connectionId", "correlationId", "sentAt"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "messageId": { "$ref": "#/$defs/uuid" },
+        "kind": { "type": "string" },
+        "connectionId": { "$ref": "#/$defs/uuid" },
+        "correlationId": { "$ref": "#/$defs/uuid" },
+        "sentAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "probeCommand": {
+      "allOf": [
+        { "$ref": "#/$defs/base" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["schemaVersion", "messageId", "kind", "connectionId", "correlationId", "sentAt"],
+          "properties": {
+            "schemaVersion": { "const": "1.0" },
+            "messageId": { "$ref": "#/$defs/uuid" },
+            "kind": { "const": "backend.probe" },
+            "connectionId": { "$ref": "#/$defs/uuid" },
+            "correlationId": { "$ref": "#/$defs/uuid" },
+            "sentAt": { "type": "string", "format": "date-time" }
+          }
+        }
+      ]
+    },
+    "startCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion", "messageId", "kind", "connectionId", "correlationId", "sentAt",
+        "executionId", "agentId", "taskId", "modelDescriptorId", "modelDescriptorVersion", "contextManifestId", "scenario", "seed", "budgets"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "messageId": { "$ref": "#/$defs/uuid" },
+        "kind": { "const": "backend.start" },
+        "connectionId": { "$ref": "#/$defs/uuid" },
+        "correlationId": { "$ref": "#/$defs/uuid" },
+        "sentAt": { "type": "string", "format": "date-time" },
+        "executionId": { "$ref": "#/$defs/uuid" },
+        "agentId": { "$ref": "#/$defs/uuid" },
+        "taskId": { "$ref": "#/$defs/uuid" },
+        "modelDescriptorId": { "$ref": "#/$defs/uuid" },
+        "modelDescriptorVersion": { "type": "integer", "minimum": 1 },
+        "contextManifestId": { "$ref": "#/$defs/uuid" },
+        "scenario": {
+          "type": "string",
+          "enum": ["PASS", "EVIDENCE_FAIL", "APPROVAL_REJECT", "INTERRUPT_BEFORE_EFFECT", "INTERRUPT_DURING_EFFECT", "INTERRUPT_AFTER_EFFECT"]
+        },
+        "seed": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "budgets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["maxInvocations", "maxRuntimeMs"],
+          "properties": {
+            "maxInvocations": { "type": "integer", "minimum": 1, "maximum": 100 },
+            "maxRuntimeMs": { "type": "integer", "minimum": 1, "maximum": 600000 }
+          }
+        }
+      }
+    },
+    "cancelCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "messageId", "kind", "connectionId", "correlationId", "sentAt", "executionId", "reason"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "messageId": { "$ref": "#/$defs/uuid" },
+        "kind": { "const": "backend.cancel" },
+        "connectionId": { "$ref": "#/$defs/uuid" },
+        "correlationId": { "$ref": "#/$defs/uuid" },
+        "sentAt": { "type": "string", "format": "date-time" },
+        "executionId": { "$ref": "#/$defs/uuid" },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 512 }
+      }
+    },
+    "resumeCommand": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schemaVersion", "messageId", "kind", "connectionId", "correlationId", "sentAt", "executionId", "modelDescriptorId", "modelDescriptorVersion", "checkpointId", "checkpointHash"],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "messageId": { "$ref": "#/$defs/uuid" },
+        "kind": { "const": "backend.resume" },
+        "connectionId": { "$ref": "#/$defs/uuid" },
+        "correlationId": { "$ref": "#/$defs/uuid" },
+        "sentAt": { "type": "string", "format": "date-time" },
+        "executionId": { "$ref": "#/$defs/uuid" },
+        "modelDescriptorId": { "$ref": "#/$defs/uuid" },
+        "modelDescriptorVersion": { "type": "integer", "minimum": 1 },
+        "checkpointId": { "$ref": "#/$defs/uuid" },
+        "checkpointHash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" }
+      }
+    },
+    "backendEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion", "messageId", "kind", "connectionId", "correlationId", "sentAt",
+        "executionId", "modelDescriptorId", "modelDescriptorVersion", "sequence", "eventType", "observable", "usage"
+      ],
+      "properties": {
+        "schemaVersion": { "const": "1.0" },
+        "messageId": { "$ref": "#/$defs/uuid" },
+        "kind": { "const": "backend.event" },
+        "connectionId": { "$ref": "#/$defs/uuid" },
+        "correlationId": { "$ref": "#/$defs/uuid" },
+        "sentAt": { "type": "string", "format": "date-time" },
+        "executionId": { "$ref": "#/$defs/uuid" },
+        "modelDescriptorId": { "$ref": "#/$defs/uuid" },
+        "modelDescriptorVersion": { "type": "integer", "minimum": 1 },
+        "sequence": { "type": "integer", "minimum": 1 },
+        "eventType": {
+          "type": "string",
+          "enum": ["STARTED", "PROGRESS", "TOOL_INTENT", "CHECKPOINT", "ARTIFACT", "COMPLETED", "FAILED", "CANCELLED"]
+        },
+        "observable": {
+          "$ref": "#/$defs/observable"
+        },
+        "usage": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["synthetic", "invocations", "units"],
+          "properties": {
+            "synthetic": { "const": true },
+            "invocations": { "type": "integer", "minimum": 0 },
+            "units": { "type": "integer", "minimum": 0 }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "eventType": { "const": "TOOL_INTENT" } }, "required": ["eventType"] },
+          "then": { "properties": { "observable": { "required": ["toolOperation", "actionDigest"] } } }
+        },
+        {
+          "if": { "properties": { "eventType": { "const": "CHECKPOINT" } }, "required": ["eventType"] },
+          "then": { "properties": { "observable": { "required": ["checkpointId", "contentHash"] } } }
+        },
+        {
+          "if": { "properties": { "eventType": { "const": "ARTIFACT" } }, "required": ["eventType"] },
+          "then": { "properties": { "observable": { "required": ["artifactId", "contentHash"] } } }
+        },
+        {
+          "if": { "properties": { "eventType": { "const": "FAILED" } }, "required": ["eventType"] },
+          "then": { "properties": { "observable": { "required": ["failureCategory"] } } }
+        }
+      ]
+    },
+    "observable": {
+      "type": "object",
+      "description": "Bounded allowlisted projection produced by the mandatory backend-event sanitizer.",
+      "additionalProperties": false,
+      "required": ["status", "summary"],
+      "properties": {
+        "status": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,63}$" },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[^\\u0000-\\u0008\\u000B\\u000C\\u000E-\\u001F]*$"
+        },
+        "progressPercent": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "toolOperation": { "const": "WRITE_APPROVED_MARKER" },
+        "actionDigest": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "checkpointId": { "$ref": "#/$defs/uuid" },
+        "artifactId": { "$ref": "#/$defs/uuid" },
+        "contentHash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+        "failureCategory": {
+          "type": "string",
+          "enum": [
+            "CANCELLED", "TIMEOUT", "CAPABILITY_UNSUPPORTED", "CHECKPOINT_INVALID",
+            "TOOL_REJECTED", "BUDGET_EXHAUSTED", "BACKEND_LOST"
+          ]
+        }
+      }
+    }
+  }
+}
