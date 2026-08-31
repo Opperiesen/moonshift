@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "1.0",
+  "feature": "001-supervised-autonomous-loop",
+  "checkpoint": "US1_START_AND_OBSERVE",
+  "generatedAt": "2026-08-31T23:06:32Z",
+  "scope": {
+    "tasks": [
+      "T025",
+      "T026",
+      "T027",
+      "T028",
+      "T029",
+      "T030",
+      "T031",
+      "T032",
+      "T033",
+      "T034",
+      "T035"
+    ],
+    "excludedFromThisCheckpoint": "T036+"
+  },
+  "revisions": {
+    "foundationBase": "19b3ef7f4a761741e0cd1c5247516c025c1f9ea3",
+    "implementation": "3ce748fce83c4ba599ff5b89789bfc93ffd0783c"
+  },
+  "environment": {
+    "node": "24.20.0",
+    "pnpm": "11.24.0",
+    "postgresql": "18.4 embedded loopback fixture",
+    "browser": "Playwright 1.62.1 Chromium"
+  },
+  "validation": [
+    {
+      "command": "node scripts/generate-contract-types.mjs --check",
+      "result": "PASS",
+      "evidence": "Generated TypeScript derivatives reproduce from the approved contracts."
+    },
+    {
+      "command": "pnpm clean && pnpm validate",
+      "result": "PASS",
+      "evidence": "Format, lint and boundaries, lockfile integrity, immutable image pins, secret scan, typecheck, 61 unit tests, 56 contract tests, and 60 integration tests passed."
+    },
+    {
+      "command": "pnpm test:acceptance",
+      "result": "PASS",
+      "evidence": "6 of 6 Chromium tests passed, including 5 US1 browser journeys."
+    },
+    {
+      "command": "pnpm --filter @moonshift/web build",
+      "result": "PASS",
+      "evidence": "Vite production build completed successfully."
+    },
+    {
+      "command": "git diff --check",
+      "result": "PASS",
+      "evidence": "No whitespace errors."
+    }
+  ],
+  "contractEvidence": {
+    "sessionBootstrap": "One-time, short-lived, origin-bound, actual-loopback-only exchange with consumed failure attempts.",
+    "projectApi": "Authenticated create/read, idempotency conflict handling, optimistic version rejection, typed validation failures, finite replay, and live SSE are covered.",
+    "providerBoundary": "Scheduling selects only the two conformant fixture connection relations and independently retains connection plus descriptor ID/version provenance."
+  },
+  "persistenceEvidence": {
+    "migration": "002_start_observe.sql upgrades a version-1 database through the checksum-locked migration manifest.",
+    "httpPath": "The authenticated HTTP control-plane assembly persists PostgreSQL project snapshots and ordered project events and replays those durable events.",
+    "atomicity": "Project organization, scheduling result, events, and idempotency result commit in one PostgreSQL transaction.",
+    "capacity": "Concurrent PostgreSQL submissions serialize on durable capacity; the default four-specialist ceiling permits four and rejects five additional submissions without partial state.",
+    "retention": "Replay reads lock the snapshot retention boundary, concurrent expiry returns either a complete replay or EVENT_CURSOR_EXPIRED, and the watermark is capped at lastSequence + 1."
+  },
+  "browserEvidence": {
+    "validJourney": "A submitted objective renders Product, Engineering, Quality, one depth-one specialist, nested channels, task state, presence, queue reason, and ordered activity.",
+    "invalidJourney": "Invalid objectives and exhausted organization capacity show actionable feedback without creating partial projects.",
+    "liveDelivery": "An event appended after the SSE connection opens appears in the activity log.",
+    "cursorRecovery": "When retention overtakes an open stream, the server emits stream.reset and the browser reloads ProjectView before resubscribing without duplicate activity."
+  },
+  "eventOrderEvidence": {
+    "ordering": "Persisted and browser-visible project sequences are strictly increasing and gap-free within the retained range.",
+    "privacy": "Public projections contain no private reasoning field or prohibited backend payload."
+  },
+  "authorityEvidence": {
+    "organization": "Default four-specialist and 24-channel limits are enforced; configured channel values cannot exceed 64 active, 8 direct children, or depth 4.",
+    "time": "Delegation deadline and lease timestamps are anchored to PostgreSQL clock_timestamp() inside the reservation transaction.",
+    "runtime": "Task deadline, authority lease, and full delegated runtime are evaluated before backend start, and the authorized runtime budget is propagated to the backend command."
+  },
+  "independentReview": {
+    "rounds": 4,
+    "reviewers": ["Ampere", "Aristotle", "us1_final_gate", "us1_final_gate_2"],
+    "finalResult": "PASS_NO_SUBSTANTIVE_FINDINGS",
+    "finalTargetedValidation": "4 unit, 7 contract, and 7 integration tests passed independently."
+  },
+  "safety": {
+    "realProviderUsed": false,
+    "providerCredentialUsed": false,
+    "unrestrictedShellUsed": false,
+    "externalNetworkEffectPerformed": false,
+    "sensitiveEffectPerformed": false,
+    "productionMutationPerformed": false,
+    "verificationClaimed": false
+  }
+}

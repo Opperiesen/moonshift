@@ -95,7 +95,7 @@ partial organization.
 - [x] T032 [US1] Implement durable project-sequenced events, complete durable-source presence projection in ProjectView, expired-cursor reset/reload, cursor replay, and SSE delivery in `apps/control-plane/src/projections/project-events.ts`
 - [x] T033 [P] [US1] Implement Projects objective/status states and accessible validation feedback in `apps/web/src/features/projects/`
 - [x] T034 [P] [US1] Implement Observe organization tree, presence, task/dependency summary, queue reason, activity stream, and reconnect states in `apps/web/src/features/observe/`
-- [ ] T035 [US1] Run the independent US1 tests and record contract, persistence, browser, and event-order evidence in `evidence/001-supervised-autonomous-loop/us1/manifest.json`
+- [x] T035 [US1] Run the independent US1 tests and record contract, persistence, browser, and event-order evidence in `evidence/001-supervised-autonomous-loop/us1/manifest.json`
 
 **Checkpoint**: US1 is demonstrable and independently accepted; it does not yet perform a sensitive
 effect or claim verification.
