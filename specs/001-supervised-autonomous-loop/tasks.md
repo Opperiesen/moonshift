@@ -82,19 +82,19 @@ partial organization.
 
 ### Tests for User Story 1
 
-- [ ] T025 [P] [US1] Add contract tests for one-time loopback session bootstrap, health, project create/read, event replay, idempotency, validation failures, unauthorized access, and optimistic concurrency in `tests/contract/projects-api.test.ts`
-- [ ] T026 [P] [US1] Add domain tests for default council creation, channel limits, delegation completeness/subsets, depth one, and specialist archival conditions in `packages/domain/src/project-organization.test.ts`
-- [ ] T027 [P] [US1] Add real-PostgreSQL journey tests for atomic project bootstrap, scheduling, routing, context compilation, fake execution, and durable event ordering in `tests/integration/start-observe.test.ts`
-- [ ] T028 [P] [US1] Add browser acceptance for valid and rejected objective flows, every defined presence state and bounded source, queue reasons, live/replayed observation, and expired-cursor ProjectView reload before resubscription in `tests/acceptance/start-observe.spec.ts`
+- [x] T025 [P] [US1] Add contract tests for one-time loopback session bootstrap, health, project create/read, event replay, idempotency, validation failures, unauthorized access, and optimistic concurrency in `tests/contract/projects-api.test.ts`
+- [x] T026 [P] [US1] Add domain tests for default council creation, channel limits, delegation completeness/subsets, depth one, and specialist archival conditions in `packages/domain/src/project-organization.test.ts`
+- [x] T027 [P] [US1] Add real-PostgreSQL journey tests for atomic project bootstrap, scheduling, routing, context compilation, fake execution, and durable event ordering in `tests/integration/start-observe.test.ts`
+- [x] T028 [P] [US1] Add browser acceptance for valid and rejected objective flows, every defined presence state and bounded source, queue reasons, live/replayed observation, and expired-cursor ProjectView reload before resubscription in `tests/acceptance/start-observe.spec.ts`
 
 ### Implementation for User Story 1
 
-- [ ] T029 [US1] Implement objective submission, atomic project/default-council bootstrap, bounded channel create/archive and task creation, and complete delegation application services in `apps/control-plane/src/application/projects/`
-- [ ] T030 [US1] Implement auditable selection only between the two eligible fixture connection relations for the shared descriptor ID/version, independently retain connection and descriptor provenance, and implement cognitive/runner capacity queue reasons, runtime creation, context compilation, and fake execution scheduling in `apps/control-plane/src/scheduler/`
-- [ ] T031 [US1] Implement one-time loopback browser session bootstrap plus project command/query routes, idempotency/version handling, actor authorization, and typed errors in `apps/control-plane/src/http/`
-- [ ] T032 [US1] Implement durable project-sequenced events, complete durable-source presence projection in ProjectView, expired-cursor reset/reload, cursor replay, and SSE delivery in `apps/control-plane/src/projections/project-events.ts`
-- [ ] T033 [P] [US1] Implement Projects objective/status states and accessible validation feedback in `apps/web/src/features/projects/`
-- [ ] T034 [P] [US1] Implement Observe organization tree, presence, task/dependency summary, queue reason, activity stream, and reconnect states in `apps/web/src/features/observe/`
+- [x] T029 [US1] Implement objective submission, atomic project/default-council bootstrap, bounded channel create/archive and task creation, and complete delegation application services in `apps/control-plane/src/application/projects/`
+- [x] T030 [US1] Implement auditable selection only between the two eligible fixture connection relations for the shared descriptor ID/version, independently retain connection and descriptor provenance, and implement cognitive/runner capacity queue reasons, runtime creation, context compilation, and fake execution scheduling in `apps/control-plane/src/scheduler/`
+- [x] T031 [US1] Implement one-time loopback browser session bootstrap plus project command/query routes, idempotency/version handling, actor authorization, and typed errors in `apps/control-plane/src/http/`
+- [x] T032 [US1] Implement durable project-sequenced events, complete durable-source presence projection in ProjectView, expired-cursor reset/reload, cursor replay, and SSE delivery in `apps/control-plane/src/projections/project-events.ts`
+- [x] T033 [P] [US1] Implement Projects objective/status states and accessible validation feedback in `apps/web/src/features/projects/`
+- [x] T034 [P] [US1] Implement Observe organization tree, presence, task/dependency summary, queue reason, activity stream, and reconnect states in `apps/web/src/features/observe/`
 - [ ] T035 [US1] Run the independent US1 tests and record contract, persistence, browser, and event-order evidence in `evidence/001-supervised-autonomous-loop/us1/manifest.json`
 
 **Checkpoint**: US1 is demonstrable and independently accepted; it does not yet perform a sensitive

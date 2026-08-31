@@ -4,6 +4,30 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    '@vitejs/plugin-react':
+      specifier: 6.1.1
+      version: 6.1.1
+    fastify:
+      specifier: 5.12.1
+      version: 5.12.1
+    pg:
+      specifier: 8.23.0
+      version: 8.23.0
+    react:
+      specifier: 19.2.8
+      version: 19.2.8
+    react-dom:
+      specifier: 19.2.8
+      version: 19.2.8
+    typescript:
+      specifier: 7.0.2
+      version: 7.0.2
+    vite:
+      specifier: 8.2.2
+      version: 8.2.2
+
 importers:
 
   .:
@@ -67,11 +91,60 @@ importers:
         specifier: 2.9.0
         version: 2.9.0
 
+  apps/control-plane:
+    dependencies:
+      '@moonshift/backend-fake':
+        specifier: workspace:*
+        version: link:../../packages/backend-fake
+      '@moonshift/context':
+        specifier: workspace:*
+        version: link:../../packages/context
+      '@moonshift/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@moonshift/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
+      '@moonshift/persistence':
+        specifier: workspace:*
+        version: link:../../packages/persistence
+      '@moonshift/policy':
+        specifier: workspace:*
+        version: link:../../packages/policy
+      fastify:
+        specifier: 'catalog:'
+        version: 5.12.1
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.0
+
   apps/runner:
     dependencies:
       '@moonshift/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+
+  apps/web:
+    dependencies:
+      '@moonshift/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      react:
+        specifier: 'catalog:'
+        version: 19.2.8
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.2.8(react@19.2.8)
+    devDependencies:
+      '@vitejs/plugin-react':
+        specifier: 'catalog:'
+        version: 6.1.1(vite@8.2.2(@types/node@24.13.3)(yaml@2.9.0))
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vite:
+        specifier: 'catalog:'
+        version: 8.2.2(@types/node@24.13.3)(yaml@2.9.0)
 
   packages/artifacts: {}
 

@@ -139,13 +139,23 @@ describe.sequential('PostgreSQL 18 persistence foundation', () => {
   it('runs checksum-locked forward-only migrations against real PostgreSQL 18', async () => {
     const version = await pool.query<{ version: string }>('SELECT version()');
     expect(version.rows[0]?.version).toContain('PostgreSQL 18.4');
-    await expect(runMigrations(pool)).resolves.toEqual({ applied: [], currentVersion: 1 });
+    await expect(runMigrations(pool)).resolves.toEqual({ applied: [], currentVersion: 2 });
     const applied = await pool.query<{ version: number; checksum: string }>(
       'SELECT version, checksum FROM moonshift_schema_migrations ORDER BY version',
     );
     expect(applied.rows).toEqual([
       { version: 1, checksum: expect.stringMatching(/^[a-f0-9]{64}$/) },
+      { version: 2, checksum: expect.stringMatching(/^[a-f0-9]{64}$/) },
     ]);
+
+    await pool.query('DROP TABLE project_events, project_snapshots');
+    await pool.query('DELETE FROM moonshift_schema_migrations WHERE version = 2');
+    await expect(runMigrations(pool)).resolves.toEqual({ applied: [2], currentVersion: 2 });
+    const retentionColumn = await pool.query(
+      `SELECT 1 FROM information_schema.columns
+       WHERE table_name = 'project_snapshots' AND column_name = 'retained_from_sequence'`,
+    );
+    expect(retentionColumn.rowCount).toBe(1);
   });
 
   it('commits aggregate, audit event, and outbox event atomically with optimistic concurrency', async () => {
