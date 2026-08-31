@@ -1,0 +1,7 @@
+{
+  "fixture": "supervised-loop-repository",
+  "version": 1,
+  "operations": ["read_release_notes", "write_marker", "read_marker"],
+  "network": "DENY",
+  "arbitraryShell": false
+}

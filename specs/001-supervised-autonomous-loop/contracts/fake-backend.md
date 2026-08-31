@@ -85,9 +85,12 @@ not probabilistic timing.
 ## Checkpoint rules
 
 The checkpoint contains every field required by FR-027 plus a fake script cursor, seed, normalized
-usage, and expected next event sequence. It is hashed and immutable. Resume rejects a corrupt hash,
-unsupported schema version, mismatched task/agent/revision, missing artifact, or capability gap. The
-optional fake session hint may be dropped without changing the outcome.
+usage, and expected next event sequence. One canonical snapshot determines both its content hash and
+derived ID. Resume rejects a corrupt hash/ID, unsupported schema version, mismatched
+task/agent/revision, invalid cursor/sequence pair, missing artifact, or capability gap. A valid resume
+emits only the suffix after the durable cursor: it never repeats tool intent or effect work already
+crossed, and a during-effect checkpoint remains `UNKNOWN` pending later reconciliation. The optional
+fake session hint may be dropped without changing the outcome.
 
 ## Failure normalization
 

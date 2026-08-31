@@ -1,0 +1,5 @@
+{
+  "extends": "../../config/typescript/tsconfig.base.json",
+  "compilerOptions": { "rootDir": "src", "outDir": "dist", "composite": true },
+  "include": ["src/**/*.ts"]
+}

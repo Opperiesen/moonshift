@@ -1,0 +1,54 @@
+{
+  "name": "moonshift",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Self-hosted autonomous software development under one human supervisor.",
+  "type": "module",
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": ">=24 <25",
+    "pnpm": "11.24.0"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "node scripts/clean.mjs",
+    "compose:check": "node scripts/check-compose-images.mjs",
+    "contracts:generate": "node scripts/generate-contract-types.mjs",
+    "contracts:validate": "vitest run --project contract",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint eslint.config.js scripts/**/*.mjs && node scripts/check-boundaries.mjs",
+    "lockfile:check": "node scripts/check-lockfile.mjs",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:contract": "vitest run --project contract",
+    "test:integration": "vitest run --project integration",
+    "test:acceptance": "playwright test",
+    "test:foundation": "pnpm test:unit && pnpm test:contract && pnpm test:integration",
+    "typecheck": "tsc -b --pretty false",
+    "validate": "node scripts/validate.mjs"
+  },
+  "dependencies": {
+    "ajv": "8.20.0",
+    "fastify": "5.12.1",
+    "pg": "8.23.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@sourcemeta/jsonschema": "16.8.0",
+    "@types/node": "24.13.3",
+    "@types/pg": "8.23.1",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5",
+    "@vitejs/plugin-react": "6.1.1",
+    "eslint": "10.9.1",
+    "embedded-postgres": "18.4.0-beta.17",
+    "prettier": "3.9.6",
+    "typescript": "7.0.2",
+    "vite": "8.2.2",
+    "vitest": "4.1.11",
+    "yaml": "2.9.0"
+  }
+}

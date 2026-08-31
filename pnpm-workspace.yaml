@@ -1,0 +1,20 @@
+packages:
+  - apps/*
+  - packages/*
+
+allowBuilds:
+  '@embedded-postgres/darwin-arm64': true
+
+strictDepBuilds: true
+strictPeerDependencies: true
+
+catalog:
+  ajv: 8.20.0
+  fastify: 5.12.1
+  pg: 8.23.0
+  react: 19.2.8
+  react-dom: 19.2.8
+  typescript: 7.0.2
+  vite: 8.2.2
+  vitest: 4.1.11
+  yaml: 2.9.0

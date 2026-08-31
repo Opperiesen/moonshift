@@ -1,32 +1,84 @@
 # Repository working rules
 
-These rules apply to work in the Moonshift repository.
+These rules apply to all work in the Moonshift repository. Moonshift is an open-source, self-hosted,
+provider-agnostic autonomous software-development workspace governed by exactly one human supervisor.
+Use **Moonshift** as the project, repository, executable, and CLI name. Normative repository artifacts
+and public documentation are written in English.
 
-## Scope and status
+## Authority and bootstrap
 
-- Use **Moonshift** as the project, repository, executable, and CLI name.
-- Write normative repository artifacts and public documentation in English.
-- Treat this repository as pre-implementation alpha. Do not describe planned behavior as shipped or supported without implementation and conformance evidence.
-- Preserve the product identity: self-hosted, one human supervisor per instance, provider-agnostic, and able to support distinct model API and coding-harness backends.
-- Keep the control plane, execution runner, and CLI boundaries explicit. Do not introduce a managed SaaS dependency as a requirement.
+For engineering decisions, use this precedence; a lower source never overrides a higher one:
 
-## Spec Kit workflow
+1. explicit instructions in the current user task;
+2. [the constitution](.specify/memory/constitution.md);
+3. the active feature specification and accepted clarifications, plan, contracts, and tasks;
+4. ratified ADRs and architecture documents;
+5. tests, schemas, generated validation, and current code behavior;
+6. [the current-work handoff](docs/development/current-work.md);
+7. conversation transcripts and model recollection.
 
-GitHub Spec Kit is Moonshift's first development method. Before meaningful implementation, read the applicable constitution, specification, plan, tasks, checklists, and analysis artifacts. Respect their ordering, dependencies, `[P]` markers, and checked task state.
+Chat is replaceable execution context, never authoritative project state. At the start of every fresh
+session, inspect the branch, `HEAD`, and worktree; read the constitution, current-work handoff, and all
+active feature artifacts; inspect task checkboxes and recorded evidence; identify the first incomplete
+in-scope task; and state the bounded scope before editing. Reconstruct state from the repository rather
+than asking the user to restate prior conversations.
 
-Specifications describe behavior and intent; plans record justified technical decisions; tasks are the execution source of truth. Update task state only after the corresponding work has been validated. Use the installed project workflow and documented commands; do not invent commands or bypass a gate.
+## Spec Kit and scope
 
-After implementation, run the targeted deterministic checks and converge the implementation against its artifacts. Keep changes small, reviewable, and limited to the requested feature.
+GitHub Spec Kit is Moonshift's first development method. Follow the accepted feature lifecycle and the
+active specification, plan, contracts, tasks, checklists, and analysis. Specifications define behavior
+and intent, plans record justified technical decisions, and `tasks.md` is authoritative for completion.
+Mark a task complete only after its implementation and required deterministic evidence exist. Do not
+rerun `$speckit-specify` or `$speckit-plan` unless a real contradiction requires the smallest possible
+correction, and never change an accepted requirement merely to fit an implementation.
 
-## Safety and repository hygiene
+Implement only the task IDs or phase explicitly assigned by the current prompt. Record later work in
+the appropriate feature or open decision without starting it. For the current Foundation checkpoint,
+the absolute boundary is `T001–T024`; `T025+` is prohibited.
 
-- Inspect repository instructions and active Spec Kit artifacts before editing.
-- Preserve unrelated work and do not overwrite concurrent changes.
-- Never commit secrets, cookies, tokens, credentials, private keys, or provider session material.
-- Do not use consumer web cookies or subscription sessions as generic API credentials.
-- Keep provider and harness types behind Moonshift-owned contracts; never use a provider session as an agent identity.
-- Do not weaken meaningful tests, disable security boundaries, or claim support without a conformance path.
-- Do not publish, push, deploy, or mutate remote infrastructure unless explicitly requested.
-- Validate the smallest relevant scope first, then inspect the final diff and report files changed, checks run, and blockers.
+## Durable session continuity
 
-The project constitution at [`.specify/memory/constitution.md`](.specify/memory/constitution.md) is authoritative when these rules or lower-level artifacts conflict.
+All material progress must be durable in Git-tracked files. Follow
+[the session continuity protocol](docs/development/session-continuity.md). Before a handoff or
+checkpoint, update [current-work.md](docs/development/current-work.md) with the active feature, allowed
+range, completed tasks, first incomplete task, branch and commit, worktree state, key files, exact
+validation results, unresolved findings, next action, and UTC timestamp. It is a concise navigation
+record, not a second task database; task checkboxes remain authoritative. Leave an atomic checkpoint
+when practical and record failed attempts without checking incomplete tasks.
+
+Resume an existing conversation for the same line of work when practical; start fresh when clean
+context is preferable and reconstruct from Git. Use forks, side conversations, or subagents only for
+bounded alternatives, independent review, or isolated investigation. The parent integrates and
+verifies results. Parallel writers need disjoint files or isolated Git worktrees, and their results are
+not durable until incorporated into repository artifacts or commits. Never launch nested `codex`,
+`codex exec`, `codex resume`, or `codex fork` processes from a Codex-generated shell command. When
+context grows long, compact or write a durable handoff instead of depending on hidden recollection.
+
+## Engineering and verification
+
+- Treat the repository as pre-implementation alpha; do not describe plans as shipped support.
+- Preserve one-supervisor, self-hosted, provider-agnostic, multi-harness product identity and the
+  explicit control-plane, runner, and CLI boundaries.
+- Use deterministic tests for deterministic behavior and contract-first/test-first work where the
+  constitution and active plan require it. Observe intended failures before success implementation.
+- Keep changes minimal and task-scoped; do not perform unrelated refactors.
+- Keep provider and harness types behind Moonshift-owned adapters and contracts. An agent identity is
+  never a provider, model, process, session, container, or conversation.
+- Do not claim completion without evidence. Run required independent review, and fail closed for
+  ambiguous authorization, verification, external effects, or resource enforcement.
+- Run the narrowest relevant checks during work, then the full checkpoint suite, final diff review,
+  and `$speckit-converge`. Never weaken a meaningful test to pass a gate.
+
+## Safety, credentials, and Git
+
+- Inspect before modifying and preserve all user or other-agent work.
+- Never commit secrets, cookies, tokens, auth caches, credentials, private keys, or provider session
+  material. Do not scrape, emulate, proxy, export, or repurpose consumer sessions.
+- Feature 001 Foundation uses no real provider authentication, unrestricted shell, uncontrolled
+  network, production deployment, or remote Git effect. Runner fixtures remain capability-minimal.
+- Do not use destructive Git operations, rewrite public history, or automatically push, publish,
+  release, deploy, or mutate remote infrastructure.
+- Do not silently resolve entries in [the decision register](docs/open-decisions.md), select a license,
+  or claim support without conformance evidence.
+- Keep commits scoped and descriptive. Commit only after the assigned checkpoint passes every
+  required validation, then report the resulting hash. Never push automatically.

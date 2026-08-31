@@ -1,0 +1,9 @@
+{
+  "forbiddenImports": [
+    {
+      "from": "packages/domain",
+      "forbid": ["apps/", "packages/persistence", "packages/backend-fake"]
+    },
+    { "from": "packages/contracts", "forbid": ["apps/", "packages/domain", "packages/persistence"] }
+  ]
+}

@@ -1,0 +1,13 @@
+.agents/
+.specify/
+config/validation/vendor/
+docs/architecture/
+docs/research/
+docs/feature-map.md
+docs/glossary.md
+docs/open-decisions.md
+specs/
+**/dist/
+**/node_modules/
+packages/contracts/src/generated.ts
+pnpm-lock.yaml

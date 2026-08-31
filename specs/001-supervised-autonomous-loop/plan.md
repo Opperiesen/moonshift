@@ -116,7 +116,10 @@ owned commands and persist aggregate changes transactionally.
    domain command.
 3. Aggregate state, immutable audit/domain event, idempotency result, and outbox row commit together.
 4. Projection and scheduler workers claim work with leases and `SKIP LOCKED`; `NOTIFY` may wake them
-   but durable polling is authoritative.
+   but durable polling is authoritative. PostgreSQL `clock_timestamp()` is the authority for durable
+   claim and lease acquisition, expiry, completion, release, publication, and fencing decisions;
+   requested durations are anchored to that database time, so caller clock skew cannot extend or
+   prematurely expire authority.
 5. SSE reads durable project-sequenced events. The browser deduplicates by event ID and reloads a
    projection when a cursor has expired.
 
@@ -124,11 +127,16 @@ owned commands and persist aggregate changes transactionally.
 
 The scheduler creates an Execution and leases a healthy conformant fake connection, budget, tools,
 and one registered fixture runner. The Context Compiler produces a manifest and fixture input. The
-runner accepts only loopback mutual-TLS streams whose certificate identity matches the enrolled
-instance/runner message identity, then schema-validates the fixture operation and current fencing
-token. Replay, revoked identity, identity mismatch, stale lease/result binding, and plaintext fail
-closed. The runner persists effect intent through the control plane and mutates a queryable fixture
-ledger only after approval.
+runner accepts commands only on loopback mutual-TLS streams authenticated by an explicitly enrolled
+control-plane client certificate whose instance URI matches `instanceId`; a runner-role certificate
+is never command authority. The control-plane client authenticates the daemon's runner server
+certificate, while every message `runnerId` remains bound to that daemon identity. The runner then
+schema-validates the fixture operation and current owner/lease/fencing token. Replay, revoked
+identity, identity mismatch, stale lease/result binding, unavailable resource enforcement, and
+plaintext fail closed. The runner persists effect intent through the control plane and mutates a
+queryable fixture ledger only after approval. Certificate revocation aborts and awaits active jobs;
+each job rechecks authority before journal or ledger publication, so a revoked stream cannot emit a
+successful result.
 
 Two fake backend instances implement identical scripts and checkpoint semantics. Runtime loss revokes
 the old fencing token, transitions through `LOST`/`RECONCILING`, queries fixture ground truth for every
@@ -171,8 +179,9 @@ credential/path/private-reasoning shaped data in backend projections, logs, even
 It performs no real network effect and binds the service to loopback. A one-time owner-local browser
 bootstrap exchange establishes a host-only HttpOnly supervisor session; the secret travels only in a
 browser fragment, is removed immediately, is never printed or logged, and cannot be reused.
-All backend observations first pass one kind-specific bounded allowlist sanitizer; raw source objects
-are never persisted or published.
+All backend observations first pass one kind-specific bounded allowlist sanitizer. Slice 001 accepts
+only its deterministic fake backend's exact versioned status/summary vocabulary; unrecognized text is
+replaced by a fixed notice and hash. Raw source objects are never persisted or published.
 
 ## Migration, Backup, and Restore
 
@@ -246,8 +255,15 @@ specs/001-supervised-autonomous-loop/
 │   ├── runner-protocol.schema.json
 │   └── fake-backend.md
 ├── checklists/
-│   ├── requirements.md
-│   └── eight reviewer-owned quality checklists
+│   ├── requirements.md (16 built-in entries)
+│   ├── backend-neutrality.md
+│   ├── credential-runner-security.md
+│   ├── durability-recovery.md
+│   ├── evidence-completion.md
+│   ├── open-source-release.md
+│   ├── organization-delegation.md
+│   ├── pve-resources.md
+│   └── single-supervisor.md (122 custom entries across these eight files)
 └── tasks.md
 ```
 
@@ -340,7 +356,9 @@ All pre-design gates remain `PASS` after the data model and contracts:
   conformance and production deployment remain later roadmap concerns.
 
 **Gate result**: PASS — design complete; task decomposition and final consistency analysis are
-recorded, and the independent requirements review accepted all 122/122 custom checklist items.
+recorded. The requirements review accepted all 16/16 built-in entries and 122/122 custom entries:
+138/138 actual checklist entries across nine files. Explanatory prose that renders the literal
+`[x]` marker is not a checklist entry.
 
 ## Complexity Tracking
 

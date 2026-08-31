@@ -247,7 +247,7 @@ or changing the selected model resource.
 | `tool_lease_id`, `budget_lease_id` | Expiring grants |
 | `provider_session_hint` | Optional opaque fake hint |
 | `status` | Ephemeral runtime lifecycle status; never the logical Agent identity state |
-| `fencing_token` | Monotonic token for effect authority |
+| `fencing_token` | Monotonic token for effect authority; positive and capped at JSON's maximum safe integer for exact runner-protocol transport |
 
 `PresenceProjection` is derived from authoritative identity, Task, Execution, ToolInvocation,
 Approval, capacity, and VerificationEvaluation state. It is exactly one of `IDLE`, `QUEUED`,
@@ -330,6 +330,13 @@ The only state-changing tool in the first slice is the controlled fixture effect
 | `git_revision` | Required expected revision |
 | `created_by_agent_id`, `created_at` | Attribution |
 
+The owner-local adapter durably publishes bytes before metadata using unique temporary files,
+file/directory fsync barriers, and no-replacement content-addressed links. Concurrent identical
+byte publications converge on one storage object, while each stable `artifact_id` retains an
+independent metadata sidecar so identical bytes with different provenance remain distinct artifacts.
+Partial bytes-only or metadata-link publication is recoverable by retry before the artifact is
+acknowledged.
+
 ### Evidence
 
 | Field | Meaning / constraint |
@@ -370,7 +377,7 @@ Task but cannot promote the Project to `COMPLETED`; after resume the project-res
 | `project_id`, `task_id`, `tool_invocation_id` | Required scope |
 | `idempotency_key`, `action_digest`, `target` | Unique intended fixture operation |
 | `state` | External effect state machine below |
-| `executor_fencing_token` | Rejects stale runtime writes |
+| `executor_execution_id`, `executor_lease_id`, `executor_owner_id`, `executor_fencing_token` | Persisted current lease authority; the runtime actor must match the owner, and verification plus the `REQUESTED` → `EXECUTING` commit serialize atomically with lease expiry/revocation/replacement |
 | `ground_truth_reference` | Fixture location queried by reconciliation |
 | `attempt_count`, `last_error` | Bounded retry evidence |
 | `reconciliation_outcome` | Applied/not-applied/indeterminate with evidence |
@@ -492,7 +499,8 @@ when applying an approval.
 4. A permission or budget child grant is never greater than its parent.
 5. Quality reviewer lineage differs from Task authoring lineage.
 6. One semantic effect key maps to one ExternalEffect regardless of execution attempt.
-7. Only the current fencing token may move an effect from `REQUESTED` to `EXECUTING`.
+7. Only the current fencing token may move an effect from `REQUESTED` to `EXECUTING`; durable lease
+   and claim validity is decided against the PostgreSQL clock, never a caller-supplied timestamp.
 8. An approval authorizes only its exact action digest before expiry.
 9. Only a complete passing VerificationEvaluation for the expected Git revision may create
    `VERIFIED`.

@@ -1,0 +1,14 @@
+{
+  "name": "@moonshift/test-fixtures",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./dist/index.js",
+    "./determinism": "./dist/determinism.js",
+    "./scenarios": "./dist/scenarios/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  }
+}

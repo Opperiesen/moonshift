@@ -35,5 +35,7 @@
 - The deterministic fake backend, browser surface, and controlled fixture are behavioral scope
   constraints, not choices of language, framework, transport, or storage technology.
 - This built-in checklist records specification validation. The eight reviewer-owned custom
-  requirements-quality checklists were independently accepted 122/122 on 2026-08-31; implementation
-  tasks remain unchecked.
+  requirements-quality checklists were independently accepted 122/122 on 2026-08-31. Together with
+  the 16/16 built-in entries above, this is 138/138 actual checklist entries across nine files;
+  explanatory prose containing the literal `[x]` marker is excluded. Implementation tasks remain
+  unchecked.

@@ -105,8 +105,12 @@ server history.
 
 **Decision**: Store artifact metadata and hashes in PostgreSQL and bytes in an owner-controlled local
 filesystem implementation for slice 001. Write to a temporary file, verify size/hash, atomically
-rename into a content-addressed key, and never infer integrity from a storage key. Define an interface
-whose semantics can be implemented by S3-compatible storage later.
+publish without replacement into a content-addressed key, and never infer integrity from a storage
+key. Temporary bytes and metadata are fsynced before publication and their owner-only directories are
+fsynced afterward. Bytes deduplicate by content hash, but metadata is keyed by stable artifact
+identity so identical content produced by different tasks or executions retains distinct provenance;
+an interrupted bytes-only or metadata-link publication converges on retry. Define an interface whose
+semantics can be implemented by S3-compatible storage later.
 
 **Rationale**: A local filesystem avoids operating another service on the 16 GB reference host and is
 sufficient for deterministic fixtures. The interface prevents path or POSIX assumptions from leaking

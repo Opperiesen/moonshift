@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: docker.io/library/postgres:18@sha256:4ef4dbc939d61acea57712655ddb4b4ab27419c913f94cca0cd57cb3ea3c2280
+    environment:
+      POSTGRES_DB: ${MOONSHIFT_DB_NAME:-moonshift}
+      POSTGRES_USER: ${MOONSHIFT_DB_USER:-moonshift}
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - 127.0.0.1:${MOONSHIFT_DB_PORT:-55432}:5432
+    volumes:
+      - moonshift-postgres:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+          pids: 256
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+volumes:
+  moonshift-postgres:

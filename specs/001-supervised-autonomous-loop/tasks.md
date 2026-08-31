@@ -26,14 +26,14 @@ changes.
 **Purpose**: Establish the pinned, reproducible implementation workspace without creating any real
 provider integration or production deployment path.
 
-- [ ] T001 Create the pnpm workspace and package scripts in `package.json` and `pnpm-workspace.yaml`, pinning the toolchain and dependency versions from `plan.md`
-- [ ] T002 [P] Configure shared strict TypeScript compilation in `tsconfig.json` and `config/typescript/tsconfig.base.json`
-- [ ] T003 [P] Configure formatting, linting, dependency-boundary checks, and secret scanning in `eslint.config.js`, `.prettierrc.json`, and `config/validation/`
-- [ ] T004 [P] Configure Vitest projects and deterministic clock/UUID helpers in `vitest.config.ts` and `packages/test-fixtures/src/determinism.ts`
-- [ ] T005 [P] Configure Playwright browser acceptance in `playwright.config.ts` and `tests/acceptance/fixtures.ts`
-- [ ] T006 Create the loopback-only local PostgreSQL 18 workflow and documented resource limits in `compose.yaml` and `.env.example`
-- [ ] T007 Create the controlled Git fixture and deterministic scenario data in `fixtures/supervised-loop-repository/` and `packages/test-fixtures/src/scenarios/`
-- [ ] T008 Add local CI-equivalent validation commands, lockfile-integrity checks, and test artifact paths in `.github/workflows/ci.yml` and `scripts/validate.mjs`
+- [x] T001 Create the pnpm workspace and package scripts in `package.json` and `pnpm-workspace.yaml`, pinning the toolchain and dependency versions from `plan.md`
+- [x] T002 [P] Configure shared strict TypeScript compilation in `tsconfig.json` and `config/typescript/tsconfig.base.json`
+- [x] T003 [P] Configure formatting, linting, dependency-boundary checks, and secret scanning in `eslint.config.js`, `.prettierrc.json`, and `config/validation/`
+- [x] T004 [P] Configure Vitest projects and deterministic clock/UUID helpers in `vitest.config.ts` and `packages/test-fixtures/src/determinism.ts`
+- [x] T005 [P] Configure Playwright browser acceptance in `playwright.config.ts` and `tests/acceptance/fixtures.ts`
+- [x] T006 Create the loopback-only local PostgreSQL 18 workflow and documented resource limits in `compose.yaml` and `.env.example`
+- [x] T007 Create the controlled Git fixture and deterministic scenario data in `fixtures/supervised-loop-repository/` and `packages/test-fixtures/src/scenarios/`
+- [x] T008 Add local CI-equivalent validation commands, lockfile-integrity checks, and test artifact paths in `.github/workflows/ci.yml` and `scripts/validate.mjs`
 
 **Checkpoint**: A clean checkout can install from the lockfile, start only local test dependencies,
 and run empty deterministic test suites without credentials or network effects.
@@ -47,22 +47,22 @@ execution boundaries that block every user story.
 
 **Critical**: No user-story implementation begins until T009–T024 pass together.
 
-- [ ] T009 [P] Add executable Draft 2020-12 and vendored official OpenAPI 3.1 schema/example validation tests for every planning contract, including exact Project/Task/Execution/Presence enum parity, round-trip coverage for every PersonaIdentity and SpecialistIdentity lifecycle state, reloadable bounded PresenceView sources, descriptor ID/version fields, satisfiable lifecycle states, and rejection of unknown/prohibited backend-event fields, in `tests/contract/planning-contracts.test.ts`
-- [ ] T010 Compile Moonshift-owned validators, the mandatory kind-specific bounded observation sanitizer, and reproducible non-authoritative TypeScript derivatives from the approved schemas into `packages/contracts/src/`
-- [ ] T011 [P] Write exhaustive legal/illegal transition and actor-authority tests for Task, TaskDependency, Execution, Approval, Project, and ExternalEffect, including acyclic dependency graphs, the serialized pause-versus-verification boundary, and distinct pause/stop/cancel/completion races, in `packages/domain/src/state-machines.test.ts`
-- [ ] T012 Implement opaque identities, aggregates, immutable task dependencies, commands, and explicit state machines without framework/provider imports in `packages/domain/src/`
-- [ ] T013 [P] Write policy tests for organization ceilings, delegation subsets, cumulative runtime versus task deadline/lease expiry/termination/archive, budgets, lineage, and actor authority in `packages/policy/src/policy.test.ts`
-- [ ] T014 Implement versioned policy profiles, capability grants, and deny-by-default decisions in `packages/policy/src/`
-- [ ] T015 Create forward-only PostgreSQL migrations, checksums, constraints, and migration locking in `packages/persistence/src/migrations/`
-- [ ] T016 [P] Write real-PostgreSQL integration tests for optimistic concurrency, aggregate/audit/event/outbox atomicity, unique audit identities, idempotency, queue claims, leases, fencing, and proof that only sanitized event projections persist in `tests/integration/persistence.test.ts`
-- [ ] T017 Implement transaction, repository, idempotency, outbox, lease, and projection checkpoint adapters in `packages/persistence/src/`
-- [ ] T018 [P] Write artifact-store tests for atomic writes, hashing, ownership, size limits, traversal, tampering, and missing bytes in `packages/artifacts/src/artifact-store.test.ts`
-- [ ] T019 Implement the owner-local content-addressed artifact port and filesystem adapter in `packages/artifacts/src/`
-- [ ] T020 [P] Write context compiler tests proving explicit manifests, classification, token budgets, artifact references, and exclusion of raw chat/private reasoning in `packages/context/src/context-compiler.test.ts`
-- [ ] T021 Implement immutable context manifests and the minimized deterministic compiler in `packages/context/src/`
-- [ ] T022 [P] Write minimum-fake-boundary conformance tests for stable distinct backend/connection/model-descriptor identities, two per-connection conformance relations exposing one shared descriptor ID/version, exact descriptor provenance on start/resume/event/Execution, strict sanitized observations, identical two-connection outcomes, and runner tests for mutual-TLS identity binding, forged/replayed/revoked/plaintext rejection, result/lease/fence binding, resource discovery, and fail-closed eligibility in `tests/contract/execution-backend-conformance.test.ts` and `tests/integration/runner-authentication.test.ts`
-- [ ] T023 Implement only the slice 001 provider-neutral minimum port, one backend-scoped separately versioned fake model descriptor, two deterministic fake connections with distinct descriptor-availability/conformance relations, fixture health/capability probes, strict observations, and scripted checkpoints in `packages/backend-fake/src/`
-- [ ] T024 Implement the separate fixture-only runner daemon with owner-local per-instance TLS 1.3 mutual authentication, enrollment/revocation, identity/message/result binding, replay denial, resource/enforcement discovery, lease validation, fencing, one fixture-process job, denied network, zero GPU request, and no shell or provider credentials in `apps/runner/src/`
+- [x] T009 [P] Add executable Draft 2020-12 and vendored official OpenAPI 3.1 schema/example validation tests for every planning contract, including exact Project/Task/Execution/Presence enum parity, round-trip coverage for every PersonaIdentity and SpecialistIdentity lifecycle state, reloadable bounded PresenceView sources, descriptor ID/version fields, satisfiable lifecycle states, and rejection of unknown/prohibited backend-event fields, in `tests/contract/planning-contracts.test.ts`
+- [x] T010 Compile Moonshift-owned validators, the mandatory kind-specific bounded observation sanitizer, and reproducible non-authoritative TypeScript derivatives from the approved schemas into `packages/contracts/src/`
+- [x] T011 [P] Write exhaustive legal/illegal transition and actor-authority tests for Task, TaskDependency, Execution, Approval, Project, and ExternalEffect, including acyclic dependency graphs, the serialized pause-versus-verification boundary, and distinct pause/stop/cancel/completion races, in `packages/domain/src/state-machines.test.ts`
+- [x] T012 Implement opaque identities, aggregates, immutable task dependencies, commands, and explicit state machines without framework/provider imports in `packages/domain/src/`
+- [x] T013 [P] Write policy tests for organization ceilings, delegation subsets, cumulative runtime versus task deadline/lease expiry/termination/archive, budgets, lineage, and actor authority in `packages/policy/src/policy.test.ts`
+- [x] T014 Implement versioned policy profiles, capability grants, and deny-by-default decisions in `packages/policy/src/`
+- [x] T015 Create forward-only PostgreSQL migrations, checksums, constraints, and migration locking in `packages/persistence/src/migrations/`
+- [x] T016 [P] Write real-PostgreSQL integration tests for optimistic concurrency, aggregate/audit/event/outbox atomicity, unique audit identities, idempotency, queue claims, leases, fencing, and proof that only sanitized event projections persist in `tests/integration/persistence.test.ts`
+- [x] T017 Implement transaction, repository, idempotency, outbox, lease, and projection checkpoint adapters in `packages/persistence/src/`
+- [x] T018 [P] Write artifact-store tests for atomic writes, hashing, ownership, size limits, traversal, tampering, and missing bytes in `packages/artifacts/src/artifact-store.test.ts`
+- [x] T019 Implement the owner-local content-addressed artifact port and filesystem adapter in `packages/artifacts/src/`
+- [x] T020 [P] Write context compiler tests proving explicit manifests, classification, token budgets, artifact references, and exclusion of raw chat/private reasoning in `packages/context/src/context-compiler.test.ts`
+- [x] T021 Implement immutable context manifests and the minimized deterministic compiler in `packages/context/src/`
+- [x] T022 [P] Write minimum-fake-boundary conformance tests for stable distinct backend/connection/model-descriptor identities, two per-connection conformance relations exposing one shared descriptor ID/version, exact descriptor provenance on start/resume/event/Execution, strict sanitized observations, identical two-connection outcomes, and runner tests for mutual-TLS identity binding, forged/replayed/revoked/plaintext rejection, result/lease/fence binding, resource discovery, and fail-closed eligibility in `tests/contract/execution-backend-conformance.test.ts` and `tests/integration/runner-authentication.test.ts`
+- [x] T023 Implement only the slice 001 provider-neutral minimum port, one backend-scoped separately versioned fake model descriptor, two deterministic fake connections with distinct descriptor-availability/conformance relations, fixture health/capability probes, strict observations, and scripted checkpoints in `packages/backend-fake/src/`
+- [x] T024 Implement the separate fixture-only runner daemon with owner-local per-instance TLS 1.3 mutual authentication, enrollment/revocation, identity/message/result binding, replay denial, resource/enforcement discovery, lease validation, fencing, one fixture-process job, denied network, zero GPU request, and no shell or provider credentials in `apps/runner/src/`
 
 **Checkpoint**: Domain transition, policy, contract, persistence, artifact, context, fake-backend
 conformance, and runner-boundary suites all pass against disposable PostgreSQL 18. This is the first

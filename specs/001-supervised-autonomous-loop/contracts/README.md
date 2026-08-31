@@ -35,21 +35,50 @@ real backend families. Passing the slice 001 fake contract is not a claim of pro
 
 Runner JSON Schema validation does not authenticate a message. Slice 001 uses a dedicated TLS 1.3
 listener bound to loopback and mutually authenticated with an owner-local per-instance CA. Setup
-creates one control-plane server certificate and one fixture-runner client certificate in an
+creates one fixture-runner server certificate and one control-plane client certificate in an
 owner-only directory (`0700` directory, `0600` private keys); private key bytes never enter protocol
-messages, logs, events, artifacts, or evidence. The runner validates the control-plane certificate and
-instance URI identity. The control plane validates the runner certificate and requires its URI identity
-to match both the enrolled `runnerId` and every message's `runnerId`; `instanceId` must likewise match
-the authenticated control-plane instance.
+messages, logs, events, artifacts, or evidence. The daemon opens TLS files without following final
+symlinks, verifies effective-UID ownership and permissions on the opened descriptors, rejects
+replaceable directory ancestry, and keeps the validated directory inode pinned until a post-read
+identity check succeeds. The runner daemon accepts commands only from an explicitly enrolled
+control-plane client certificate whose instance URI matches `instanceId`; a runner-role certificate
+can never issue a lease or command. The control-plane client validates the runner server certificate
+and requires its runner URI identity to match every message's `runnerId`.
 
-Every lease, command, result, heartbeat, and registration is accepted only on that authenticated
-stream. Receivers persist processed `messageId` values, bind results to `operationMessageId`,
+Every lease, command, result, heartbeat, and registration is accepted only in its authenticated
+direction on that stream. Receivers persist processed `messageId` values, bind results to `operationMessageId`,
 `executionId`, `leaseId`, and the current fencing token, and reject identity mismatch, plaintext
 transport, replay, expired certificate, unknown issuer, or revoked certificate serial before domain
 handling. Revocation marks the Runner disabled, closes its streams, fences its leases, and requires a
-new certificate and explicit re-enrollment; revocation never revives old authority. Split/non-loopback
-enrollment and certificate rotation UX remain slice 006 work, but unauthenticated runner transport is
-not permitted in this slice.
+new certificate and explicit re-enrollment; it also aborts and awaits active fixture jobs before the
+daemon closes so revoked work cannot publish a result or mutate the ledger. Revocation never revives
+old authority. Split/non-loopback enrollment and certificate rotation UX remain slice 006 work, but
+unauthenticated runner transport is not permitted in this slice.
+
+Runner-protocol fencing tokens are positive JSON safe integers (`1..9007199254740991`). PostgreSQL
+stores them as `bigint`, enforces the same ceiling, and fails closed instead of allocating a token that
+the JSON boundary could not represent exactly.
+
+Accepted fixture lease offers and their monotonically increasing execution fences are committed to
+the same durable runner snapshot as their processed message IDs. Restart reconstructs both current
+lease authority and the highest fence per execution, so a superseded fence cannot regain authority
+through a new message ID. Certificate revocation atomically marks every persisted runner lease
+revoked as well as recording the certificate serial; another enrolled certificate therefore cannot
+revive pre-revocation authority after restart. Revocation fences leases, aborts work, and closes the
+streams before persistence, durably disables the Runner, and requires explicit enrollment of a new
+certificate to reactivate it. A pending-revocation marker preserves that disabled state across restart
+even if the main snapshot fails before rename; configured bootstrap enrollments cannot silently
+reactivate it. Independently, the daemon durably creates an active-runtime guard before accepting any
+authority and removes it only after a proven clean shutdown. Its presence on startup proves that the
+prior runtime ended ambiguously, so even rollback of both the main snapshot and an unsynced pending
+marker remains fail-closed. On a persistence failure, the live daemon quarantines all authority and
+stops accepting connections instead of continuing with an unconfirmed revocation.
+
+The fixture runner journal fsyncs a complete temporary snapshot before atomic rename and fsyncs its
+owner-only parent directory before acknowledging the write. A failed pre-rename persistence barrier
+cannot advance in-memory replay/effect state or publish a successful result. A failure after rename
+makes the live journal durability uncertain and quarantines the daemon until restart reloads and
+reconciles the complete on-disk snapshot; the same process cannot retry the effect blindly.
 
 The loopback management stream is the daemon's only network connection and is not exposed to fixture
 operations. `networkMode: DENY` describes the leased job/fixture capability: the operation receives no
@@ -62,16 +91,20 @@ Backend output is untrusted input. Before any backend observation can become aut
 audit, outbox, SSE, evidence, error detail, or UI data, one deterministic projection sanitizer must:
 
 - construct a new object from the allowlisted schema fields instead of spreading source objects;
-- enforce kind-specific schema, field/count/length bounds, normalized reason codes, and classification;
+- enforce kind-specific schema, field/count/length bounds, normalized reason codes, classification,
+  and an exact versioned status/summary vocabulary for this deterministic fake backend;
 - reject unknown keys, control characters, absolute or traversal paths, credential-shaped values,
   authorization headers, private-key material, raw prompts/transcripts, and private reasoning fields;
-- replace a rejected observation with a safe attributable policy/audit notice while retaining only its
-  source message ID and content hash for investigation.
+- replace a rejected observation with a safe attributable policy/audit notice while retaining only a
+  schema-valid UUID source message ID (otherwise `null`) and a one-way content hash for investigation.
 
 The strict `payload` and `observable` schemas are the only persisted/public forms. Raw backend payloads
 are never written to PostgreSQL, logs, artifacts, events, errors, or evidence bundles. Contract and
 security tests must reject every prohibited class above, including attempts hidden in nested or
-unknown fields.
+unknown fields and unrecognized free-form summaries containing embedded paths, secrets, or transcript
+text. At-least-once delivery is idempotent only when the stable message ID, source hash, execution,
+classification, and sanitized projection are identical; divergent reuse of a message ID is rejected
+as an idempotency conflict.
 
 ## Security classification
 

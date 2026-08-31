@@ -1,0 +1,14 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/contracts" },
+    { "path": "./packages/domain" },
+    { "path": "./packages/policy" },
+    { "path": "./packages/persistence" },
+    { "path": "./packages/artifacts" },
+    { "path": "./packages/context" },
+    { "path": "./packages/backend-fake" },
+    { "path": "./packages/test-fixtures" },
+    { "path": "./apps/runner" }
+  ]
+}
