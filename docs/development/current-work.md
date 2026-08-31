@@ -3,11 +3,12 @@
 - Active feature: `001-supervised-autonomous-loop`
 - Allowed task range: `T001–T024`
 - Checkpoint: `Foundation`
-- Status: `READY_FOR_LOCAL_CHECKPOINT`
+- Status: `FOUNDATION_COMPLETE`
 - Branch: `main`
 - Foundation base: `be12d4b936f799b6ba5a21bd9f456d27b761b455` (Iteration 0 checkpoint)
-- Worktree: dirty — fully validated candidate awaiting final review and local checkpoint commit
-- Last updated: `2026-08-31T20:44:48Z`
+- Foundation checkpoint: `857f0f9b0221` (`feat: establish supervised autonomy foundation`)
+- Worktree: clean after local Foundation checkpoint
+- Last updated: `2026-08-31T20:50:15Z`
 
 ## Completed tasks
 
@@ -68,6 +69,6 @@ do not start it until the next bounded iteration is explicitly authorized.
 
 ## Exact next action
 
-Complete the fresh independent review, then create the local Foundation checkpoint commit. T025
-starts the project API/user-story implementation and requires an explicitly authorized next bounded
-iteration; do not start it as Foundation follow-up work.
+The Foundation checkpoint is complete; stop here. T025 starts the project API/user-story
+implementation and is the first task of the next explicitly authorized bounded iteration; do not
+start it as Foundation follow-up work.
