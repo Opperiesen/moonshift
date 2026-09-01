@@ -33,8 +33,10 @@ rerun `$speckit-specify` or `$speckit-plan` unless a real contradiction requires
 correction, and never change an accepted requirement merely to fit an implementation.
 
 Implement only the task IDs or phase explicitly assigned by the current prompt. Record later work in
-the appropriate feature or open decision without starting it. For the current Foundation checkpoint,
-the absolute boundary is `T001–T024`; `T025+` is prohibited.
+the appropriate feature or open decision without starting it. Feature 001 is complete through T086.
+For Feature 002, planning may prepare the complete lifecycle, but production implementation is
+prohibited until a separately started implementation checkpoint. The first such checkpoint is
+`T001–T035`; `T036+` remains prohibited until the US1 checkpoint is accepted.
 
 ## Durable session continuity
 
@@ -74,8 +76,8 @@ context grows long, compact or write a durable handoff instead of depending on h
 - Inspect before modifying and preserve all user or other-agent work.
 - Never commit secrets, cookies, tokens, auth caches, credentials, private keys, or provider session
   material. Do not scrape, emulate, proxy, export, or repurpose consumer sessions.
-- Feature 001 Foundation uses no real provider authentication, unrestricted shell, uncontrolled
-  network, production deployment, or remote Git effect. Runner fixtures remain capability-minimal.
+- Features 001 and 002 use no real provider authentication, unrestricted shell, uncontrolled network,
+  production deployment, or remote Git effect. Runner and backend fixtures remain capability-minimal.
 - Do not use destructive Git operations, rewrite public history, or automatically push, publish,
   release, deploy, or mutate remote infrastructure.
 - Do not silently resolve entries in [the decision register](docs/open-decisions.md), select a license,

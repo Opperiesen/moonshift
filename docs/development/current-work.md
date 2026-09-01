@@ -1,73 +1,85 @@
 # Current Moonshift Work
 
-- Active feature: `001-supervised-autonomous-loop`
-- Allowed task range: `T076–T086`
-- Checkpoint: `Phase 8 — Hardening and Cross-Cutting Validation`
-- Status: `PHASE_8_COMPLETE`
-- Branch: `codex/phase8-hardening`
-- Phase 8 base: `97012d7024831fe5810b9e2897fa843bdf55d13e`
-- Validated implementation revision: `de2f29d640351b219c2be09121784006d9d9bc7e`
-- Completion checkpoint: `cd84656bb7a4b99d5bb81e5f938a940e483e6ada`
-- Worktree: clean after the final continuity-only checkpoint
-- Last updated: `2026-09-01T20:35:08Z`
+- Active feature: `002-execution-backend-contracts`
+- Allowed task range: planning artifacts only; the next separately started implementation checkpoint
+  is `T001–T035`
+- Checkpoint: `Feature 002 lifecycle preparation before US1`
+- Status: `READY_FOR_US1_IMPLEMENTATION`
+- Branch: `codex/002-execution-backend-contracts`
+- Feature 001 integrated base: `e9e3c05432b2356e5bf41eb4585339fa8d890399`
+- Planning checkpoint: pending local commit
+- Worktree: planning changes present; no Feature 002 implementation task has started
+- Last updated: `2026-09-01T21:48:09Z`
 
-## Completed tasks
+## Completed lifecycle preparation
 
-`T076–T086` — negative security coverage; PostgreSQL migration and validated backup/restore;
-single-project 1/3/5 cognitive-capacity evaluation with default four-specialist topology; resource
-instrumentation and the fixture-only 16 GB PVE profile; all deterministic test manifests; complete
-quickstart and revision-bound evidence; operations/security documentation; zero-finding convergence;
-independent regression/contract/security/scope review; and the final checklist, clean-checkout,
-repository-validation, evidence-integrity, and forbidden-scope gates.
+- Feature 001 is complete through T086 and is integrated into local `main` and this branch.
+- Feature 002 has completed `$speckit-specify`, `$speckit-clarify`, `$speckit-plan`,
+  `$speckit-checklist`, `$speckit-tasks`, and cross-artifact `$speckit-analyze` preparation.
+- The specification contains 36 functional requirements, 11 success criteria, deterministic
+  acceptance scenarios, explicit fixture-only scope, and no unresolved clarification markers.
+- The plan, research, data model, quickstart, six strict JSON Schemas, initial US1 OpenAPI contract,
+  three reviewer-owned quality checklists, and 92 dependency-ordered tasks are present.
+- Independent repository exploration and two planning-review passes were used. The fresh post-repair
+  review approved T001–T035 readiness with no unresolved finding; all 93 reviewer-owned checklist
+  criteria are approved and checked.
+
+## Completed implementation tasks
+
+None for Feature 002. All `T001–T092` task markers remain unchecked. This checkpoint deliberately
+stops before implementation.
 
 ## First incomplete task
 
-None. Feature `001-supervised-autonomous-loop` is complete through `T086`. Any further feature or
-production-provider work requires a separately authorized specification and task range.
+`T001` — establish the Feature 002 workspace/package references and dependency boundary. The next
+bounded implementation session may complete Foundation plus US1 `T001–T035`, must preserve
+contract-first RED evidence, and must stop with `T036` as the first incomplete task.
 
-## Principal files changed
+## Principal planning files
 
-- `tests/security/security-boundaries.test.ts` — fail-closed negative security matrix
-- `packages/persistence/src/backup.ts`, `packages/persistence/src/maintenance.ts`, and
-  `tests/recovery/backup-restore.test.ts` — validated restore plus exclusive/shared PostgreSQL
-  maintenance exclusion and deterministic concurrent-write proof
-- `tests/performance/reference-capacity.test.ts` and
-  `tests/performance/fixtures/single-project-cognitive-load.ts` — real fake-backend scheduler work,
-  PostgreSQL/outbox/SSE/Chromium visibility, queue-boundary probes, and resource metrics
-- `apps/runner/src/instrumentation.ts`, `config/observability/reference-capacity.json`, and
-  `deploy/evaluation/proxmox-ve-16gb.json` — fail-closed fixture resource discovery/evaluation
-- `docs/operations/`, `README.md`, and `SECURITY.md` — local evaluation, backup/restore,
-  architecture, limitations, and fixture-only security posture
-- `evidence/001-supervised-autonomous-loop/full/` — canonical test, browser, capacity, coverage,
-  review, convergence, quickstart, and final-validation records
-- `specs/001-supervised-autonomous-loop/tasks.md` — T076–T086 completed
+- `specs/002-execution-backend-contracts/spec.md` — accepted behavior, trust boundaries, scenarios,
+  functional requirements, success criteria, and exclusions
+- `specs/002-execution-backend-contracts/plan.md` — architecture, security, persistence, migration,
+  deterministic test strategy, and implementation phases
+- `specs/002-execution-backend-contracts/research.md` — bounded decisions and rejected alternatives
+- `specs/002-execution-backend-contracts/data-model.md` — identities, immutable evidence, relations,
+  state transitions, and cross-entity invariants
+- `specs/002-execution-backend-contracts/contracts/` — provider-neutral schemas and initial US1
+  loopback supervisor API
+- `specs/002-execution-backend-contracts/tasks.md` — authoritative T001–T092 execution state
+- `specs/002-execution-backend-contracts/checklists/` — requirements, backend-contract,
+  conformance, and security/recovery quality gates
 
 ## Verification evidence
 
-| Command or gate               | Result | Notes                                                                                                                                                                   |
-| ----------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| All eleven quickstart suites  | PASS   | 91 unit, 71 contract, 114 PostgreSQL integration, 40 runner, 23 Chromium, 33 recovery, 9 crash-matrix, 15 security, 1 migration, 5 restore, and 1 capacity test         |
-| `pnpm clean && pnpm validate` | PASS   | Pinned Node.js 24.20.0/pnpm 11.24.0; formatting, lint, boundaries, lockfile, image pins, secret scan, typecheck, and every repository-native deterministic suite passed |
-| Fresh isolated checkout       | PASS   | Frozen offline install reused 196 packages with zero download, then typecheck, 71 contracts, 40 runner tests, and 23 Chromium tests passed with no tracked changes      |
-| Independent final review      | PASS   | Fresh post-repair Terra reviewer found zero blocking findings across regression, contracts, security, scope, capacity semantics, and restore exclusion                  |
-| `$speckit-converge`           | PASS   | 42 FRs, 12 success criteria, 25 acceptance scenarios, 16 edge cases, 12 plan areas, and 20 constitution principles checked; zero findings and zero tasks appended       |
-| Required checklists           | PASS   | Nine files, 138 checked items, zero unchecked items                                                                                                                     |
-| Evidence integrity            | PASS   | Canonical report hashes and the implementation revision match the final manifest                                                                                        |
-| `git diff --check`            | PASS   | No whitespace errors                                                                                                                                                    |
+| Command or gate                   | Result | Notes                                                                                                                                                                                                                   |
+| --------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| JSON Schema strict compilation    | PASS   | Six Draft 2020-12 schemas compile with Ajv `strict: true` and registered UUID/date-time formats                                                                                                                         |
+| Initial OpenAPI structure         | PASS   | OpenAPI 3.1 parses and exposes only the two authenticated US1 qualification paths on the existing loopback API                                                                                                          |
+| Task structure                    | PASS   | 92 unique sequential task IDs, exact checklist syntax, dependency/user-story ordering, and T001–T035 first checkpoint                                                                                                   |
+| `pnpm clean && pnpm validate`     | PASS   | Pinned Node.js 24.20.0/pnpm 11.24.0; formatting, lint, boundaries, lockfile, image pins, secret scan, typecheck, 91 unit, 71 contract, 114 PostgreSQL integration, 33 recovery, 15 security, and 1 capacity test passed |
+| `pnpm test:acceptance`            | PASS   | 23 Chromium acceptance tests passed                                                                                                                                                                                     |
+| Web build                         | PASS   | Vite production build completed                                                                                                                                                                                         |
+| Generated contract check          | PASS   | `pnpm contracts:generate` produced no tracked diff                                                                                                                                                                      |
+| Independent final planning review | PASS   | Fresh post-repair reviewer approved readiness for T001–T035 and every criterion in the three reviewer-owned checklists                                                                                                  |
+| `$speckit-analyze`                | PASS   | Final rerun: 36 FRs, 11 success criteria, 92 sequential tasks, complete reviewed coverage, 109 checked checklist items, and zero unresolved marker or contradiction                                                     |
+| `git diff --check`                | PASS   | No whitespace errors                                                                                                                                                                                                    |
 
 ## Open findings and bounded limitations
 
-- No unresolved implementation, convergence, review, security, or validation finding remains.
-- The host defaults remain outside repository pins; all authoritative validation used the pinned
-  Node.js 24.20.0/pnpm 11.24.0 wrapper.
-- Capacity and resource results are deterministic local/PVE-equivalent fixture evidence, not a
-  physical Proxmox certification or real-provider load guarantee.
-- Rootless OCI execution, hostile repositories, real provider connectivity and credentials,
-  production backup scheduling, deployment, and remote Git mutation remain outside feature 001.
-- Restore's internal trusted callback receives the exclusive-lock-owning PostgreSQL client and must
-  continue to use the maintenance-aware recovery entry point to avoid self-waiting.
+- No unresolved specification, planning, contract, task, checklist, review, or validation finding
+  remains at the pre-implementation checkpoint.
+- All Feature 002 profiles, descriptors, adapters, reports, and support projections are deterministic
+  test fixtures. No real model API, routing gateway, coding harness, local runtime, authentication mode,
+  provider account, consumer session, or provider compatibility is implemented or claimed.
+- Provider credential variables must be absent and fixture processes must enforce denied external
+  network, arbitrary shell, and deployment capabilities in Foundation/US1 evidence.
+- Open decisions OD-005–OD-010 remain unresolved and cannot be inferred from fixtures or planning.
+- The host defaults remain outside repository pins; authoritative validation uses the pinned Node.js
+  24.20.0/pnpm 11.24.0 wrapper.
+- No deployment, production mutation, remote Git mutation, or push is authorized.
 
 ## Exact next action
 
-No implementation action remains. Await the next separately scoped request and do not push this
-branch unless the supervisor explicitly asks.
+Create the local planning checkpoint commit and stop. In a separate task, start T001–T035 at T001 and
+do not begin T036 until the US1 checkpoint has been accepted.

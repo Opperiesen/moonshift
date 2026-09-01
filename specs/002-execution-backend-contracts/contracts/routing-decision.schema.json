@@ -1,0 +1,198 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moonshift.dev/schemas/v2/routing-decision.json",
+  "title": "Moonshift Execution Route Decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "routeDecisionId",
+    "routingSnapshotId",
+    "routingSnapshotHash",
+    "executionRequirementId",
+    "executionRequirementHash",
+    "policyVersion",
+    "evaluatorVersion",
+    "createdAt",
+    "validUntil",
+    "outcome",
+    "candidates",
+    "selectionReasonCode",
+    "contentHash"
+  ],
+  "properties": {
+    "contractVersion": { "const": "2.0" },
+    "routeDecisionId": { "$ref": "#/$defs/uuid" },
+    "routingSnapshotId": { "$ref": "#/$defs/uuid" },
+    "routingSnapshotHash": { "$ref": "#/$defs/hash" },
+    "executionRequirementId": { "$ref": "#/$defs/uuid" },
+    "executionRequirementHash": { "$ref": "#/$defs/hash" },
+    "policyVersion": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "evaluatorVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "createdAt": { "$ref": "#/$defs/timestamp" },
+    "validUntil": { "$ref": "#/$defs/timestamp" },
+    "outcome": { "enum": ["SELECTED", "BLOCKED", "QUEUED"] },
+    "candidates": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 1000,
+      "items": { "$ref": "#/$defs/candidate" }
+    },
+    "selectedConnectionId": { "$ref": "#/$defs/uuid" },
+    "selectedModelDescriptorId": { "$ref": "#/$defs/uuid" },
+    "selectedModelDescriptorVersion": { "$ref": "#/$defs/positiveVersion" },
+    "selectionReasonCode": { "$ref": "#/$defs/reasonCode" },
+    "revalidation": { "$ref": "#/$defs/revalidation" },
+    "contentHash": { "$ref": "#/$defs/hash" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": { "outcome": { "const": "SELECTED" } }
+      },
+      "then": {
+        "type": "object",
+        "required": [
+          "selectedConnectionId",
+          "selectedModelDescriptorId",
+          "selectedModelDescriptorVersion",
+          "revalidation"
+        ],
+        "properties": {
+          "selectedConnectionId": { "$ref": "#/$defs/uuid" },
+          "selectedModelDescriptorId": { "$ref": "#/$defs/uuid" },
+          "selectedModelDescriptorVersion": { "$ref": "#/$defs/positiveVersion" },
+          "revalidation": { "$ref": "#/$defs/revalidation" }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": { "outcome": { "enum": ["BLOCKED", "QUEUED"] } }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "selectedConnectionId": false,
+          "selectedModelDescriptorId": false,
+          "selectedModelDescriptorVersion": false
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "positiveVersion": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+    "reasonCode": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,95}$" },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "connectionId",
+        "configurationRevision",
+        "adapterReleaseId",
+        "modelDescriptorId",
+        "modelDescriptorVersion",
+        "familyProfileId",
+        "familyProfileVersion",
+        "qualificationId",
+        "qualificationHash",
+        "probeSnapshotId",
+        "probeSnapshotHash",
+        "healthSnapshotId",
+        "healthSnapshotHash",
+        "conformanceReportId",
+        "conformanceReportHash",
+        "eligible",
+        "exclusionReasonCodes",
+        "tieBreakValues"
+      ],
+      "properties": {
+        "ordinal": { "type": "integer", "minimum": 1, "maximum": 1000 },
+        "connectionId": { "$ref": "#/$defs/uuid" },
+        "configurationRevision": { "$ref": "#/$defs/positiveVersion" },
+        "adapterReleaseId": { "$ref": "#/$defs/uuid" },
+        "modelDescriptorId": { "$ref": "#/$defs/uuid" },
+        "modelDescriptorVersion": { "$ref": "#/$defs/positiveVersion" },
+        "familyProfileId": { "type": "string", "minLength": 3, "maxLength": 128 },
+        "familyProfileVersion": { "$ref": "#/$defs/positiveVersion" },
+        "qualificationId": { "$ref": "#/$defs/uuid" },
+        "qualificationHash": { "$ref": "#/$defs/hash" },
+        "probeSnapshotId": { "$ref": "#/$defs/uuid" },
+        "probeSnapshotHash": { "$ref": "#/$defs/hash" },
+        "healthSnapshotId": { "$ref": "#/$defs/uuid" },
+        "healthSnapshotHash": { "$ref": "#/$defs/hash" },
+        "conformanceReportId": { "$ref": "#/$defs/uuid" },
+        "conformanceReportHash": { "$ref": "#/$defs/hash" },
+        "eligible": { "type": "boolean" },
+        "exclusionReasonCodes": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 64,
+          "items": { "$ref": "#/$defs/reasonCode" }
+        },
+        "tieBreakValues": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["key", "value"],
+            "properties": {
+              "key": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,63}$" },
+              "value": { "type": "string", "minLength": 1, "maxLength": 256 }
+            }
+          }
+        }
+      }
+    },
+    "revalidation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "connectionConfigurationRevision",
+        "adapterReleaseId",
+        "modelDescriptorId",
+        "modelDescriptorVersion",
+        "familyProfileId",
+        "familyProfileVersion",
+        "policyVersion",
+        "executionRequirementHash",
+        "qualificationId",
+        "qualificationHash",
+        "healthSnapshotId",
+        "healthSnapshotHash",
+        "authorityLeaseId",
+        "authorityFencingToken",
+        "capacitySnapshotHash",
+        "budgetSnapshotHash",
+        "classificationRequirementHash"
+      ],
+      "properties": {
+        "connectionConfigurationRevision": { "$ref": "#/$defs/positiveVersion" },
+        "adapterReleaseId": { "$ref": "#/$defs/uuid" },
+        "modelDescriptorId": { "$ref": "#/$defs/uuid" },
+        "modelDescriptorVersion": { "$ref": "#/$defs/positiveVersion" },
+        "familyProfileId": { "type": "string", "minLength": 3, "maxLength": 128 },
+        "familyProfileVersion": { "$ref": "#/$defs/positiveVersion" },
+        "policyVersion": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "executionRequirementHash": { "$ref": "#/$defs/hash" },
+        "qualificationId": { "$ref": "#/$defs/uuid" },
+        "qualificationHash": { "$ref": "#/$defs/hash" },
+        "healthSnapshotId": { "$ref": "#/$defs/uuid" },
+        "healthSnapshotHash": { "$ref": "#/$defs/hash" },
+        "authorityLeaseId": { "$ref": "#/$defs/uuid" },
+        "authorityFencingToken": { "type": "string", "pattern": "^[1-9][0-9]{0,38}$" },
+        "capacitySnapshotHash": { "$ref": "#/$defs/hash" },
+        "budgetSnapshotHash": { "$ref": "#/$defs/hash" },
+        "classificationRequirementHash": { "$ref": "#/$defs/hash" },
+        "checkpointCompatibilityHash": { "$ref": "#/$defs/hash" }
+      }
+    }
+  }
+}

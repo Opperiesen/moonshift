@@ -1,0 +1,274 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moonshift.dev/schemas/v2/conformance-report.json",
+  "title": "Moonshift Execution Backend Conformance Report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "reportId",
+    "runId",
+    "target",
+    "profile",
+    "corpus",
+    "normalizationVersion",
+    "startedAt",
+    "finishedAt",
+    "validUntil",
+    "status",
+    "cases",
+    "summary",
+    "supportScope",
+    "realSupportClaim",
+    "evaluatorVersion",
+    "evidenceArtifactId",
+    "evidenceHash",
+    "contentHash"
+  ],
+  "properties": {
+    "contractVersion": { "const": "2.0" },
+    "reportId": { "$ref": "#/$defs/uuid" },
+    "runId": { "$ref": "#/$defs/uuid" },
+    "target": { "$ref": "#/$defs/target" },
+    "profile": { "$ref": "#/$defs/profile" },
+    "corpus": { "$ref": "#/$defs/corpus" },
+    "normalizationVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "startedAt": { "$ref": "#/$defs/timestamp" },
+    "finishedAt": { "$ref": "#/$defs/timestamp" },
+    "validUntil": { "$ref": "#/$defs/timestamp" },
+    "status": { "enum": ["PASSED", "FAILED", "CANCELLED", "INCOMPLETE"] },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/caseResult" }
+    },
+    "summary": { "$ref": "#/$defs/summary" },
+    "supportScope": { "const": "TEST_FIXTURE_ONLY" },
+    "realSupportClaim": { "const": false },
+    "evaluatorVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "evidenceArtifactId": { "$ref": "#/$defs/uuid" },
+    "evidenceHash": { "$ref": "#/$defs/hash" },
+    "contentHash": { "$ref": "#/$defs/hash" }
+  },
+  "allOf": [
+    {
+      "if": {
+        "type": "object",
+        "properties": { "status": { "const": "PASSED" } }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "object",
+            "properties": {
+              "failed": { "const": 0 },
+              "cancelled": { "const": 0 },
+              "incomplete": { "const": 0 },
+              "mandatoryComplete": { "const": true },
+              "mandatoryPassed": { "const": true }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "type": "object",
+        "properties": { "status": { "enum": ["CANCELLED", "INCOMPLETE"] } }
+      },
+      "then": {
+        "type": "object",
+        "properties": {
+          "summary": {
+            "type": "object",
+            "properties": {
+              "mandatoryComplete": { "const": false },
+              "mandatoryPassed": { "const": false }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "positiveVersion": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+    "capabilityId": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,63}$" },
+    "reasonCode": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,95}$" },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "backendId",
+        "adapterReleaseId",
+        "adapterName",
+        "adapterVersion",
+        "implementationKind",
+        "connectionId",
+        "configurationRevision",
+        "modelDescriptorId",
+        "modelDescriptorVersion",
+        "conformanceLeaseId",
+        "fencingToken"
+      ],
+      "properties": {
+        "backendId": { "$ref": "#/$defs/uuid" },
+        "adapterReleaseId": { "$ref": "#/$defs/uuid" },
+        "adapterName": { "type": "string", "minLength": 3, "maxLength": 128 },
+        "adapterVersion": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?$"
+        },
+        "implementationKind": { "const": "FIXTURE" },
+        "connectionId": { "$ref": "#/$defs/uuid" },
+        "configurationRevision": { "$ref": "#/$defs/positiveVersion" },
+        "modelDescriptorId": { "$ref": "#/$defs/uuid" },
+        "modelDescriptorVersion": { "$ref": "#/$defs/positiveVersion" },
+        "conformanceLeaseId": { "$ref": "#/$defs/uuid" },
+        "fencingToken": { "type": "string", "pattern": "^[1-9][0-9]{0,38}$" }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "familyKind",
+        "familyProfileId",
+        "familyProfileVersion",
+        "profileManifestHash",
+        "testOnly",
+        "claimedCapabilities"
+      ],
+      "properties": {
+        "familyKind": {
+          "enum": ["MODEL_API", "CODING_HARNESS", "LOCAL_RUNTIME", "DETERMINISTIC_FIXTURE"]
+        },
+        "familyProfileId": { "type": "string", "minLength": 3, "maxLength": 128 },
+        "familyProfileVersion": { "$ref": "#/$defs/positiveVersion" },
+        "profileManifestHash": { "$ref": "#/$defs/hash" },
+        "testOnly": { "const": true },
+        "claimedCapabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 256,
+          "items": { "$ref": "#/$defs/capabilityId" }
+        }
+      }
+    },
+    "corpus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["corpusId", "corpusVersion", "contractVersions", "manifestHash", "seed"],
+      "properties": {
+        "corpusId": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{2,127}$" },
+        "corpusVersion": { "$ref": "#/$defs/positiveVersion" },
+        "contractVersions": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" }
+        },
+        "manifestHash": { "$ref": "#/$defs/hash" },
+        "seed": { "type": "string", "minLength": 1, "maxLength": 256 }
+      }
+    },
+    "caseResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ordinal",
+        "caseId",
+        "caseVersion",
+        "requirement",
+        "applicability",
+        "status",
+        "inputHash",
+        "expectedHash",
+        "actualHash",
+        "startedAt",
+        "finishedAt",
+        "durationMs",
+        "reasonCodes",
+        "evidenceHash"
+      ],
+      "properties": {
+        "ordinal": { "type": "integer", "minimum": 1, "maximum": 500 },
+        "caseId": { "type": "string", "pattern": "^[A-Z][A-Z0-9_.-]{2,127}$" },
+        "caseVersion": { "$ref": "#/$defs/positiveVersion" },
+        "requirement": { "enum": ["MANDATORY", "OPTIONAL"] },
+        "applicability": { "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
+        "status": {
+          "enum": ["PASSED", "FAILED", "NOT_APPLICABLE", "CANCELLED", "INCOMPLETE"]
+        },
+        "inputHash": { "$ref": "#/$defs/hash" },
+        "expectedHash": { "$ref": "#/$defs/hash" },
+        "actualHash": { "$ref": "#/$defs/hash" },
+        "startedAt": { "$ref": "#/$defs/timestamp" },
+        "finishedAt": { "$ref": "#/$defs/timestamp" },
+        "durationMs": { "type": "integer", "minimum": 0, "maximum": 86400000 },
+        "reasonCodes": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 64,
+          "items": { "$ref": "#/$defs/reasonCode" }
+        },
+        "evidenceHash": { "$ref": "#/$defs/hash" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": { "applicability": { "const": "NOT_APPLICABLE" } }
+          },
+          "then": {
+            "type": "object",
+            "properties": { "status": { "const": "NOT_APPLICABLE" } }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": { "applicability": { "const": "APPLICABLE" } }
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "status": { "enum": ["PASSED", "FAILED", "CANCELLED", "INCOMPLETE"] }
+            }
+          }
+        }
+      ]
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total",
+        "applicable",
+        "passed",
+        "failed",
+        "notApplicable",
+        "cancelled",
+        "incomplete",
+        "mandatoryComplete",
+        "mandatoryPassed"
+      ],
+      "properties": {
+        "total": { "type": "integer", "minimum": 1, "maximum": 500 },
+        "applicable": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "passed": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "failed": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "notApplicable": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "cancelled": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "incomplete": { "type": "integer", "minimum": 0, "maximum": 500 },
+        "mandatoryComplete": { "type": "boolean" },
+        "mandatoryPassed": { "type": "boolean" }
+      }
+    }
+  }
+}

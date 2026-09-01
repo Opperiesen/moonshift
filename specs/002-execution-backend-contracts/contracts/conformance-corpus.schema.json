@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moonshift.dev/schemas/v2/conformance-corpus.json",
+  "title": "Moonshift Execution Backend Conformance Corpus Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contractVersion",
+    "corpusId",
+    "corpusVersion",
+    "normalizationVersion",
+    "seed",
+    "clockEpoch",
+    "maxConcurrency",
+    "cases",
+    "contentHash"
+  ],
+  "properties": {
+    "contractVersion": { "const": "2.0" },
+    "corpusId": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{2,127}$" },
+    "corpusVersion": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+    "normalizationVersion": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "seed": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "clockEpoch": { "type": "string", "format": "date-time" },
+    "maxConcurrency": { "type": "integer", "minimum": 1, "maximum": 16 },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 500,
+      "items": { "$ref": "#/$defs/case" }
+    },
+    "contentHash": { "$ref": "#/$defs/hash" }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "caseId",
+        "caseVersion",
+        "caseKind",
+        "layer",
+        "applicabilityRule",
+        "requirement",
+        "inputFixtureHash",
+        "expectedObservationHash",
+        "forbiddenFieldClasses",
+        "seedMode",
+        "clockMode",
+        "budgets"
+      ],
+      "properties": {
+        "caseId": { "type": "string", "pattern": "^[A-Z][A-Z0-9_.-]{2,127}$" },
+        "caseVersion": { "type": "integer", "minimum": 1, "maximum": 2147483647 },
+        "caseKind": {
+          "enum": [
+            "DISCOVERY",
+            "CAPABILITY_TRUTH",
+            "AUTHENTICATION_STATUS",
+            "START",
+            "ORDERED_STREAM",
+            "RESULT",
+            "FAILURE",
+            "CANCELLATION",
+            "TIMEOUT",
+            "CHECKPOINT_RECOVERY",
+            "ARTIFACT",
+            "TOOL_INTENT",
+            "USAGE",
+            "HEALTH",
+            "CREDENTIAL_ISOLATION",
+            "PROVENANCE",
+            "IDEMPOTENCY",
+            "RECONCILIATION",
+            "CRASH_BOUNDARY",
+            "MALFORMED_OUTPUT"
+          ]
+        },
+        "layer": { "enum": ["COMMON", "FAMILY", "CAPABILITY"] },
+        "applicabilityRule": {
+          "enum": ["ALWAYS", "EXACT_FAMILY", "EXACT_FAMILY_AND_CLAIMED_CAPABILITY"]
+        },
+        "familyProfileId": { "type": "string", "pattern": "^[a-z][a-z0-9.-]{2,127}$" },
+        "capabilityId": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,63}$" },
+        "requirement": { "enum": ["MANDATORY", "OPTIONAL"] },
+        "inputFixtureHash": { "$ref": "#/$defs/hash" },
+        "expectedObservationHash": { "$ref": "#/$defs/hash" },
+        "forbiddenFieldClasses": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 16,
+          "items": {
+            "enum": [
+              "CREDENTIAL",
+              "CONSUMER_SESSION",
+              "PROVIDER_PRIVATE",
+              "RAW_ERROR",
+              "PRIVATE_REASONING",
+              "RAW_TRANSCRIPT",
+              "ARBITRARY_PATH",
+              "UNCLASSIFIED_EXTENSION"
+            ]
+          }
+        },
+        "seedMode": { "const": "DERIVE_FROM_CORPUS_SEED_AND_CASE_ID_VERSION" },
+        "clockMode": { "const": "RESET_TO_CORPUS_EPOCH" },
+        "budgets": { "$ref": "#/$defs/caseBudgets" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": { "layer": { "const": "COMMON" } }
+          },
+          "then": {
+            "type": "object",
+            "properties": {
+              "applicabilityRule": { "const": "ALWAYS" },
+              "requirement": { "const": "MANDATORY" }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": { "layer": { "const": "FAMILY" } }
+          },
+          "then": {
+            "type": "object",
+            "required": ["familyProfileId"],
+            "properties": {
+              "familyProfileId": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9.-]{2,127}$"
+              },
+              "applicabilityRule": { "const": "EXACT_FAMILY" }
+            }
+          }
+        },
+        {
+          "if": {
+            "type": "object",
+            "properties": { "layer": { "const": "CAPABILITY" } }
+          },
+          "then": {
+            "type": "object",
+            "required": ["familyProfileId", "capabilityId"],
+            "properties": {
+              "familyProfileId": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9.-]{2,127}$"
+              },
+              "capabilityId": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{1,63}$" },
+              "applicabilityRule": { "const": "EXACT_FAMILY_AND_CLAIMED_CAPABILITY" },
+              "requirement": { "const": "MANDATORY" }
+            }
+          }
+        }
+      ]
+    },
+    "caseBudgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxRuntimeMs",
+        "maxEvents",
+        "maxArtifacts",
+        "maxUsageRecords",
+        "maxPayloadBytes",
+        "maxPayloadDepth"
+      ],
+      "properties": {
+        "maxRuntimeMs": { "type": "integer", "minimum": 1, "maximum": 60000 },
+        "maxEvents": { "type": "integer", "minimum": 1, "maximum": 10000 },
+        "maxArtifacts": { "type": "integer", "minimum": 0, "maximum": 256 },
+        "maxUsageRecords": { "type": "integer", "minimum": 0, "maximum": 64 },
+        "maxPayloadBytes": { "type": "integer", "minimum": 1, "maximum": 65536 },
+        "maxPayloadDepth": { "type": "integer", "minimum": 1, "maximum": 16 }
+      }
+    }
+  }
+}
