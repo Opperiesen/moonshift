@@ -3,7 +3,7 @@
 - Active feature: `002-execution-backend-contracts`
 - Allowed task range: planning artifacts only; the next separately started implementation checkpoint
   is `T001–T035`
-- Checkpoint: `Feature 002 lifecycle preparation before US1; public repository operational`
+- Checkpoint: `Feature 002 lifecycle preparation before US1; public repository fully verified`
 - Status: `READY_FOR_US1_IMPLEMENTATION`
 - Branch: `codex/002-execution-backend-contracts`
 - Publication branch: `codex/public-repo-showcase`
@@ -14,8 +14,10 @@
 - Public CI portability checkpoint: `2cb6852944c371af0bf7345754ec6ce779a7c8b5`
 - Public CI stability checkpoint: `569fb850657966e26512013d428fa46dba10e065`
 - Public CI browser-bootstrap checkpoint: `ca3c0bff73b5328c936bd0dd2101032f1f34dfc3`
-- Worktree: clean after the continuity-only checkpoint; no Feature 002 implementation task has started
-- Last updated: `2026-09-01T23:34:14Z`
+- Public CI green checkpoint: `56015e40eec19ecdace3dbf874b5b0dc23ad0534`
+- Worktree: clean after the final publication continuity checkpoint; no Feature 002 implementation
+  task has started
+- Last updated: `2026-09-01T23:56:38Z`
 
 ## Completed public-repository preparation
 
@@ -43,9 +45,15 @@
   STOP has durably reconciled the `EXECUTING` boundary, without changing production concurrency or
   adding retries. Public run `33571439073` proved that repair and reached the capacity test, where it
   exposed that Chromium was installed after `pnpm validate` despite being required during validation.
-  The workflow now bootstraps Chromium first. Local pinned validation, acceptance tests, workflow
-  checks, and fresh independent review pass; a new remote main run remains the last publication check
-  after synchronization.
+  The workflow now bootstraps Chromium first.
+- Public run `33571933964` then passed the functional capacity assertions but exposed Linux
+  PostgreSQL teardown errors and a local cold-cache reproduction exposed five parallel Vite servers
+  invalidating one shared optimizer cache. Teardown now accepts only PostgreSQL `57P01` during the
+  explicit embedded stop phase, and each acceptance server owns a distinct ignored cache.
+- Public run [`33573046524`](https://github.com/Opperiesen/moonshift/actions/runs/33573046524)
+  passed the clean install, Chromium bootstrap, complete validation, capacity teardown, 23 Chromium
+  acceptance scenarios, and artifact upload on `main` at `56015e4`. No Dependabot pull request
+  remains open; the former major-update proposals closed after the pinned workflow updates.
 
 ## Completed lifecycle preparation
 
@@ -104,10 +112,14 @@ incomplete task.
 | Public-readiness validation       | PASS   | Pinned full `pnpm validate`, 23 Chromium acceptance tests, local Markdown-link resolution, YAML parsing, Apache/MIT license checks, SVG XML validation, and full-history credential-pattern scan                        |
 | Independent public review         | PASS   | Fresh post-repair review found no unresolved blocker across license, ownership, claims, attribution, contribution, security, or GitHub community configuration                                                          |
 | Public GitHub security            | PASS   | Visibility, metadata, Apache-2.0 detection, 100% community profile, private reporting, dependency alerts/updates, secret scanning/push protection, and external-fork approval verified                                  |
-| Public CI cold-install repair     | PASS   | Exact native build approvals, host boundary, Dependabot policy, unchanged lockfile, pinned install, full `pnpm validate`, and fresh independent review pass locally; remote main run pending synchronization            |
-| Public CI OpenSSL portability     | PASS   | 55 targeted tests, full pinned validation, 23 Chromium tests, workflow YAML validation, and fresh independent review pass; remote main run pending synchronization                                                      |
-| Public CI concurrency stability   | PASS   | Stale-version race diagnosed, 10 consecutive targeted runs, full pinned validation, 23 Chromium tests, and fresh independent review pass; new remote main run pending synchronization                                   |
-| Public CI browser bootstrap       | PASS   | Chromium installation now precedes the capacity test inside `pnpm validate`; workflow formatting, YAML/order checks, and fresh independent review pass; new remote main run pending synchronization                     |
+| Public CI cold-install repair     | PASS   | Exact native build approvals, supported-host boundary, Dependabot policy, unchanged lockfile, and pinned clean install passed in public run 33573046524                                                                 |
+| Public CI OpenSSL portability     | PASS   | Portable fixed-date certificate generation, 55 targeted tests, full validation, and public Linux execution passed in run 33573046524                                                                                    |
+| Public CI concurrency stability   | PASS   | Stale-version race diagnosed, 10 consecutive targeted runs, full pinned validation, and public Linux execution passed in run 33573046524                                                                                |
+| Public CI browser bootstrap       | PASS   | Chromium installation precedes the capacity test inside `pnpm validate`; the capacity and acceptance phases passed in run 33573046524                                                                                   |
+| Public CI teardown stability      | PASS   | Exact shutdown-phase `57P01` handling, 10 consecutive capacity runs, two full local validations, fresh independent review, and public Ubuntu validation passed                                                          |
+| Parallel acceptance stability     | PASS   | Five isolated Vite caches; 5 consecutive cold-cache parallel runs plus the public 23-test acceptance phase passed without `Outdated Optimize Dep`                                                                       |
+| Public `main` workflow            | PASS   | Run 33573046524 completed every step successfully on `56015e40eec19ecdace3dbf874b5b0dc23ad0534`; validation artifact uploaded                                                                                           |
+| Dependabot cleanup                | PASS   | Zero open pull requests after the repository-pinned current Actions generations and minor/patch update policy took effect                                                                                               |
 
 ## Open findings and bounded limitations
 
@@ -128,7 +140,5 @@ incomplete task.
 
 ## Exact next action
 
-Synchronize the final public CI stability checkpoint and require one green `main` CI run. Confirm that
-Dependabot applies the minor/patch policy without leaving obsolete major-update pull requests. Then,
-in a separate task, start T001–T035 at T001 and do not begin T036 until the US1 checkpoint has been
-accepted.
+In a separate task, start Feature 002 Foundation plus US1 at T001, complete only T001–T035, and do
+not begin T036 until that US1 checkpoint has been accepted.
