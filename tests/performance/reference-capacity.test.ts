@@ -4,14 +4,18 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+import { chromium, type Browser } from '@playwright/test';
 import EmbeddedPostgres from 'embedded-postgres';
 import { Pool } from 'pg';
+import { createServer as createViteServer, type ViteDevServer } from 'vite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
-  PostgresProjectRepository,
-  ProjectService,
+  createPostgresControlPlane,
+  InMemoryApprovedEffectExecutor,
   recoverPostgresDeliveryState,
+  type ProjectEvent,
+  type ProjectView,
 } from '../../apps/control-plane/src/index.js';
 import { FixtureScheduler } from '../../apps/control-plane/src/scheduler/index.js';
 import {
@@ -21,6 +25,7 @@ import {
   evaluateFixtureEligibility,
   FixtureLeaseRegistry,
 } from '../../apps/runner/src/index.js';
+import { planningValidators } from '../../packages/contracts/src/index.js';
 import {
   collectPostgresObservability,
   createFixtureBackup,
@@ -129,7 +134,11 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
         }),
     ).toThrow('constitutional ceiling');
 
-    const eventLatencyByConcurrency: Record<string, readonly number[]> = {};
+    const scheduledObservationsByConcurrency: Record<
+      string,
+      readonly Readonly<Record<string, unknown>>[]
+    > = {};
+    const schedulerBatchMsByConcurrency: Record<string, number> = {};
     for (const concurrency of [1, 3, 5] as const) {
       const scheduler = new FixtureScheduler({
         now: () => new Date(),
@@ -165,50 +174,353 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
         true,
       );
       expect(results.every(({ queueReason }) => queueReason === 'WAITING_FOR_APPROVAL')).toBe(true);
-      const eventLatencies = results.flatMap(({ observations }) => observations.map(() => elapsed));
-      expect(eventLatencies).not.toHaveLength(0);
-      eventLatencyByConcurrency[String(concurrency)] = Object.freeze(eventLatencies);
+      const observations = results.flatMap(({ observations: executionObservations }) =>
+        executionObservations.map((observation) => observation),
+      );
+      expect(observations).not.toHaveLength(0);
+      scheduledObservationsByConcurrency[String(concurrency)] = Object.freeze(observations);
+      schedulerBatchMsByConcurrency[String(concurrency)] = elapsed;
     }
+
+    const controlPlanePort = await unusedLoopbackPort();
+    const controlPlaneOrigin = `http://127.0.0.1:${String(controlPlanePort)}`;
+    const webPort = await unusedLoopbackPort();
+    const origin = `http://127.0.0.1:${String(webPort)}`;
+    const bootstrapSecret = 'z'.repeat(48);
+    const artifactRoot = join(testRoot, 'control-plane-artifacts');
+    const controlPlane = createPostgresControlPlane({
+      pool: sourcePool,
+      bootstrapSecret,
+      origin,
+      supervisorId,
+      expectedRevision: revision,
+      runnerId: '78000000-0000-4000-8030-000000000001',
+      nextId: createDeterministicUuid('capacity-postgres-control-plane'),
+      effectExecutor: new InMemoryApprovedEffectExecutor(),
+      artifactRoot,
+      recoveryScanIntervalMs: 60_000,
+    });
+    let browser: Browser | undefined;
+    let vite: ViteDevServer | undefined;
+    let postgres: Awaited<ReturnType<typeof collectPostgresObservability>> | undefined;
+    const eventLatencyByConcurrency: Record<string, readonly number[]> = {};
+    const submissionLatencies: number[] = [];
+    const commandLatencies: Array<{ readonly command: string; readonly milliseconds: number }> = [];
+    const projects: ProjectView[] = [];
+    try {
+      await controlPlane.server.listen({ host: '127.0.0.1', port: controlPlanePort });
+      const bootstrap = await fetch(`${controlPlaneOrigin}/v1/session/bootstrap`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin },
+        body: JSON.stringify({ bootstrapSecret }),
+      });
+      expect(bootstrap.status).toBe(204);
+      const cookie = bootstrap.headers.get('set-cookie')?.split(';')[0];
+      if (cookie === undefined) throw new Error('Expected capacity supervisor session cookie');
+
+      for (let index = 0; index < 4; index += 1) {
+        const started = performance.now();
+        const response = await fetch(`${controlPlaneOrigin}/v1/projects`, {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            cookie,
+            'idempotency-key': `capacity-objective-${String(index)}`,
+            'x-correlation-id': `78000000-0000-4000-8010-${String(index).padStart(12, '0')}`,
+          },
+          body: JSON.stringify({
+            objective: `Persist deterministic capacity fixture ${String(index)}`,
+            fixtureScenario: 'PASS',
+          }),
+        });
+        submissionLatencies.push(performance.now() - started);
+        const responseBody = await response.text();
+        expect(response.status, responseBody).toBe(201);
+        projects.push(JSON.parse(responseBody) as ProjectView);
+      }
+      const projectRecords = await Promise.all(
+        projects.map(({ projectId }) => controlPlane.repository.get(projectId)),
+      );
+      expect(
+        projectRecords
+          .slice(0, 3)
+          .every((record) => record?.scheduling.queueReason === 'WAITING_FOR_APPROVAL'),
+      ).toBe(true);
+      expect(projectRecords[3]?.scheduling.queueReason).toBe('COGNITIVE_CAPACITY');
+
+      postgres = await collectPostgresObservability(sourcePool);
+      expect(postgres.connections).toBeLessThanOrEqual(20);
+      expect(postgres.waitingLocks).toBe(0);
+      expect(postgres.pendingOutboxEvents).toBe(0);
+      expect(postgres.outboxLagMs).toBe(0);
+      expect(postgres.queuedExecutions).toBe(1);
+      expect(postgres.queueReasons).toMatchObject({ COGNITIVE_CAPACITY: 1 });
+
+      vite = await createViteServer({
+        root: 'apps/web',
+        logLevel: 'silent',
+        server: {
+          host: '127.0.0.1',
+          port: webPort,
+          strictPort: true,
+          proxy: { '/v1': `http://127.0.0.1:${String(controlPlanePort)}` },
+        },
+      });
+      await vite.listen();
+      browser = await chromium.launch();
+      const browserContext = await browser.newContext();
+      const cookieSeparator = cookie.indexOf('=');
+      if (cookieSeparator <= 0) throw new Error('Capacity session cookie is malformed');
+      await browserContext.addCookies([
+        {
+          name: cookie.slice(0, cookieSeparator),
+          value: cookie.slice(cookieSeparator + 1),
+          url: origin,
+        },
+      ]);
+      const connectedProject = projects[0];
+      if (connectedProject === undefined) throw new Error('Expected a connected capacity project');
+      await browserContext.addInitScript((projectId) => {
+        localStorage.setItem('moonshift.activeProjectId', projectId);
+      }, connectedProject.projectId);
+      const page = await browserContext.newPage();
+      await page.goto(origin);
+      await page.getByRole('heading', { name: 'Observe' }).waitFor();
+      await page.getByText('Connection: Live').waitFor();
+
+      const validators = planningValidators();
+      const nextVisibleEventId = createDeterministicUuid('capacity-visible-event');
+      for (const concurrency of [1, 3, 5] as const) {
+        const observations = scheduledObservationsByConcurrency[String(concurrency)] ?? [];
+        const summaries = observations.map(
+          (_, index) =>
+            `Capacity ${String(concurrency)} execution observable event ${String(index + 1)}`,
+        );
+        const commitTimes: number[] = [];
+        for (let index = 0; index < summaries.length; index += 1) {
+          const summary = summaries[index];
+          if (summary === undefined) throw new Error('Expected capacity event summary');
+          await controlPlane.repository.mutate({
+            scope: 'capacity-browser-event',
+            idempotencyKey: `capacity-browser-${String(concurrency)}-${String(index)}`,
+            requestHash: sha256(Buffer.from(summary)),
+            projectId: connectedProject.projectId,
+            mutate: async (record, authorityNow) => {
+              const sequence = record.view.lastSequence + 1;
+              const version = record.view.version + 1;
+              const event: ProjectEvent = Object.freeze({
+                schemaVersion: '1.0',
+                eventId: nextVisibleEventId(),
+                projectId: connectedProject.projectId,
+                sequence,
+                kind: 'audit.notice',
+                occurredAt: authorityNow,
+                actor: Object.freeze({ type: 'SYSTEM', id: nextVisibleEventId() }),
+                aggregate: Object.freeze({
+                  type: 'PROJECT',
+                  id: connectedProject.projectId,
+                  version,
+                }),
+                correlationId: nextVisibleEventId(),
+                classification: 'PUBLIC_FIXTURE',
+                payload: Object.freeze({
+                  code: 'CAPACITY_BROWSER_VISIBILITY',
+                  severity: 'INFO',
+                  summary,
+                }),
+              });
+              validators.eventEnvelope.assert(event);
+              return {
+                record: Object.freeze({
+                  ...record,
+                  view: Object.freeze({ ...record.view, version, lastSequence: sequence }),
+                  events: Object.freeze([...record.events, event]),
+                }),
+                response: Object.freeze({ sequence }),
+              };
+            },
+          });
+          commitTimes.push(performance.now());
+        }
+        const displayedAt = await Promise.all(
+          summaries.map(async (summary) => {
+            await page
+              .getByRole('log', { name: 'Project activity' })
+              .getByText(summary, { exact: true })
+              .waitFor({ state: 'visible', timeout: 10_000 });
+            return performance.now();
+          }),
+        );
+        const latencies = displayedAt.map((displayed, index) =>
+          Math.max(0, displayed - (commitTimes[index] ?? displayed)),
+        );
+        expect(latencies).toHaveLength(summaries.length);
+        expect(latencies).not.toHaveLength(0);
+        for (const summary of summaries) {
+          expect(
+            await page
+              .getByRole('log', { name: 'Project activity' })
+              .getByText(summary, { exact: true })
+              .count(),
+          ).toBe(1);
+        }
+        eventLatencyByConcurrency[String(concurrency)] = Object.freeze(latencies);
+      }
+      const activitySequences = await page
+        .getByRole('log', { name: 'Project activity' })
+        .getByRole('listitem')
+        .evaluateAll((items) => items.map((item) => Number(item.getAttribute('data-sequence'))));
+      expect(activitySequences).toEqual([...activitySequences].sort((left, right) => left - right));
+      expect(new Set(activitySequences).size).toBe(activitySequences.length);
+
+      const measureHttpCommand = async (
+        command: string,
+        path: string,
+        request: NonNullable<Parameters<typeof fetch>[1]>,
+        expectedStatus: number,
+      ) => {
+        const started = performance.now();
+        const response = await fetch(`${controlPlaneOrigin}${path}`, request);
+        const milliseconds = performance.now() - started;
+        const responseBody = await response.text();
+        expect(response.status, responseBody).toBe(expectedStatus);
+        commandLatencies.push(Object.freeze({ command, milliseconds }));
+      };
+      const firstProjectId = projects[0]?.projectId;
+      if (firstProjectId === undefined) throw new Error('Expected first capacity project');
+      let firstRecord = await controlPlane.repository.get(firstProjectId);
+      if (firstRecord === null) throw new Error('Expected first capacity project record');
+      await measureHttpCommand(
+        'PAUSE',
+        `/v1/projects/${firstProjectId}/commands/pause`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            cookie,
+            'idempotency-key': 'capacity-command-pause',
+            'x-correlation-id': '78000000-0000-4000-8040-000000000001',
+            'if-match': `"${String(firstRecord.view.version)}"`,
+          },
+          body: JSON.stringify({ reason: 'Measure durable fixture pause acknowledgement' }),
+        },
+        202,
+      );
+      firstRecord = await controlPlane.repository.get(firstProjectId);
+      if (firstRecord === null) throw new Error('Expected paused capacity project');
+      await measureHttpCommand(
+        'RESUME',
+        `/v1/projects/${firstProjectId}/commands/resume`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            cookie,
+            'idempotency-key': 'capacity-command-resume',
+            'x-correlation-id': '78000000-0000-4000-8040-000000000002',
+            'if-match': `"${String(firstRecord.view.version)}"`,
+          },
+          body: JSON.stringify({ reason: 'Measure durable fixture resume acknowledgement' }),
+        },
+        202,
+      );
+      firstRecord = await controlPlane.repository.get(firstProjectId);
+      if (firstRecord === null) throw new Error('Expected resumed capacity project');
+      await measureHttpCommand(
+        'STOP',
+        `/v1/projects/${firstProjectId}/commands/stop`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            cookie,
+            'idempotency-key': 'capacity-command-stop',
+            'x-correlation-id': '78000000-0000-4000-8040-000000000003',
+            'if-match': `"${String(firstRecord.view.version)}"`,
+          },
+          body: JSON.stringify({ reason: 'Measure durable fixture stop acknowledgement' }),
+        },
+        202,
+      );
+
+      for (const [projectIndex, decision] of [
+        [1, 'APPROVE'],
+        [2, 'REJECT'],
+      ] as const) {
+        const projectId = projects[projectIndex]?.projectId;
+        if (projectId === undefined) throw new Error('Expected approval capacity project');
+        const record = await controlPlane.repository.get(projectId);
+        const approval = record?.supervision.approvals[0];
+        if (approval === undefined) throw new Error('Expected capacity approval');
+        await measureHttpCommand(
+          decision,
+          `/v1/projects/${projectId}/approvals/${approval.approvalId}/decision`,
+          {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              cookie,
+              'idempotency-key': `capacity-command-${decision.toLocaleLowerCase('en-US')}`,
+              'x-correlation-id':
+                decision === 'APPROVE'
+                  ? '78000000-0000-4000-8040-000000000004'
+                  : '78000000-0000-4000-8040-000000000005',
+              'if-match': `"${String(approval.version)}"`,
+            },
+            body: JSON.stringify({
+              decision,
+              actionDigest: approval.actionDigest,
+              reason: `Measure durable fixture ${decision.toLocaleLowerCase('en-US')} acknowledgement`,
+            }),
+          },
+          200,
+        );
+      }
+
+      const fourthProjectId = projects[3]?.projectId;
+      if (fourthProjectId === undefined) throw new Error('Expected queued capacity project');
+      const fourthRecord = await controlPlane.repository.get(fourthProjectId);
+      if (fourthRecord === null) throw new Error('Expected queued capacity project record');
+      await measureHttpCommand(
+        'CANCEL',
+        `/v1/projects/${fourthProjectId}/commands/cancel`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            cookie,
+            'idempotency-key': 'capacity-command-cancel',
+            'x-correlation-id': '78000000-0000-4000-8040-000000000006',
+            'if-match': `"${String(fourthRecord.view.version)}"`,
+          },
+          body: JSON.stringify({ reason: 'Measure durable fixture cancel acknowledgement' }),
+        },
+        202,
+      );
+    } finally {
+      await browser?.close();
+      await vite?.close();
+      await controlPlane.server.close();
+    }
+
+    if (postgres === undefined) throw new Error('PostgreSQL capacity metrics were not collected');
     const eventP95AtThree = percentile(eventLatencyByConcurrency['3'] ?? [], 0.95);
     const eventP95AtFive = percentile(eventLatencyByConcurrency['5'] ?? [], 0.95);
     expect(eventP95AtThree).toBeLessThanOrEqual(profile.goals.eventVisibilityP95MsAtThree);
     expect(eventP95AtFive).toBeLessThanOrEqual(profile.goals.eventVisibilityP95MsAtFive);
-
-    const repository = new PostgresProjectRepository(sourcePool);
-    const scheduler = new FixtureScheduler({
-      now: () => new Date(),
-      nextId: createDeterministicUuid('capacity-persistent-scheduler'),
-      expectedRevision: revision,
-    });
-    const service = new ProjectService({
-      repository,
-      scheduler,
-      nextId: createDeterministicUuid('capacity-persistent-project'),
-    });
-    const commandLatencies: number[] = [];
-    const projects = [];
-    for (let index = 0; index < 4; index += 1) {
-      const started = performance.now();
-      const project = await service.submitObjective({
-        actorId: supervisorId,
-        idempotencyKey: `capacity-objective-${String(index)}`,
-        correlationId: `78000000-0000-4000-8010-${String(index).padStart(12, '0')}`,
-        objective: `Persist deterministic capacity fixture ${String(index)}`,
-        fixtureScenario: 'PASS',
-      });
-      commandLatencies.push(performance.now() - started);
-      projects.push(project);
-    }
-    expect(
-      projects
-        .slice(0, 3)
-        .every(({ scheduling }) => scheduling.queueReason === 'WAITING_FOR_APPROVAL'),
-    ).toBe(true);
-    expect(projects[3]?.scheduling.queueReason).toBe('COGNITIVE_CAPACITY');
-    const commandP95 = percentile(commandLatencies, 0.95);
+    const commandMilliseconds = commandLatencies.map(({ milliseconds }) => milliseconds);
+    const commandP50 = percentile(commandMilliseconds, 0.5);
+    const commandP95 = percentile(commandMilliseconds, 0.95);
+    expect(commandLatencies.map(({ command }) => command)).toEqual([
+      'PAUSE',
+      'RESUME',
+      'STOP',
+      'APPROVE',
+      'REJECT',
+      'CANCEL',
+    ]);
     expect(commandP95).toBeLessThanOrEqual(profile.goals.commandDurabilityP95Ms);
 
-    const postgres = await collectPostgresObservability(sourcePool);
     expect(postgres.connections).toBeLessThanOrEqual(20);
     expect(postgres.waitingLocks).toBe(0);
     expect(postgres.pendingOutboxEvents).toBe(0);
@@ -293,10 +605,9 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
     expect(recovery.projectionReplayBlockedProjectIds).toEqual([]);
     expect(restartInspectionMs).toBeLessThanOrEqual(profile.goals.restartInspectionMs);
 
-    const artifactRoot = join(testRoot, 'artifacts');
     const backupDirectory = join(testRoot, 'backup');
     const restoredArtifactRoot = join(testRoot, 'restored-artifacts');
-    await mkdir(artifactRoot, { mode: 0o700 });
+    await mkdir(artifactRoot, { mode: 0o700, recursive: true });
     await writeFile(join(artifactRoot, 'capacity.bin'), 'capacity-fixture', { mode: 0o600 });
     const contractBytes = await readFile(
       new URL(
@@ -348,11 +659,46 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
     const report = {
       schemaVersion: '1.0',
       profile: 'foundation-16gb-pve-evaluation',
-      concurrency: {
-        one: { eventVisibilityP95Ms: percentile(eventLatencyByConcurrency['1'] ?? [], 0.95) },
-        three: { eventVisibilityP95Ms: eventP95AtThree },
-        five: { eventVisibilityP95Ms: eventP95AtFive },
+      measurement: {
+        eventVisibility:
+          'PostgreSQL commit completion to connected Chromium DOM visibility over loopback SSE',
+        commandDurability:
+          'Loopback HTTP request to response after PostgreSQL transaction and outbox drain',
       },
+      concurrency: {
+        one: {
+          cognitiveExecutions: 1,
+          schedulerBatchMs: schedulerBatchMsByConcurrency['1'],
+          committedObservableEvents: eventLatencyByConcurrency['1']?.length ?? 0,
+          eventVisibilityP50Ms: percentile(eventLatencyByConcurrency['1'] ?? [], 0.5),
+          eventVisibilityP95Ms: percentile(eventLatencyByConcurrency['1'] ?? [], 0.95),
+        },
+        three: {
+          cognitiveExecutions: 3,
+          schedulerBatchMs: schedulerBatchMsByConcurrency['3'],
+          committedObservableEvents: eventLatencyByConcurrency['3']?.length ?? 0,
+          eventVisibilityP50Ms: percentile(eventLatencyByConcurrency['3'] ?? [], 0.5),
+          eventVisibilityP95Ms: eventP95AtThree,
+        },
+        five: {
+          cognitiveExecutions: 5,
+          schedulerBatchMs: schedulerBatchMsByConcurrency['5'],
+          committedObservableEvents: eventLatencyByConcurrency['5']?.length ?? 0,
+          eventVisibilityP50Ms: percentile(eventLatencyByConcurrency['5'] ?? [], 0.5),
+          eventVisibilityP95Ms: eventP95AtFive,
+        },
+      },
+      projectSubmission: {
+        count: submissionLatencies.length,
+        p50Ms: percentile(submissionLatencies, 0.5),
+        p95Ms: percentile(submissionLatencies, 0.95),
+      },
+      commandDurability: {
+        commands: commandLatencies,
+        p50Ms: commandP50,
+        p95Ms: commandP95,
+      },
+      commandDurabilityP50Ms: commandP50,
       commandDurabilityP95Ms: commandP95,
       queue: {
         reasons: postgres.queueReasons,
