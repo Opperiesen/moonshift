@@ -174,20 +174,20 @@ ground truth remains unknown.
 
 ### Tests for User Story 4
 
-- [ ] T058 [P] [US4] Add checkpoint compatibility, completeness, hash, and backend-neutrality contract tests in `tests/contract/checkpoint.test.ts`
-- [ ] T059 [P] [US4] Add crash-matrix integration tests before/during/after effect and outbox boundaries in `tests/recovery/effect-crash-matrix.test.ts`
-- [ ] T060 [P] [US4] Add restart, lease-expiry, stale-fencing, missing/corrupt checkpoint, and unknown-outcome tests in `tests/recovery/runtime-recovery.test.ts`
-- [ ] T061 [P] [US4] Add cross-backend continuation tests proving stable specialist/task identities and no duplicated normalized work in `tests/recovery/backend-switch.test.ts`
-- [ ] T062 [P] [US4] Add browser acceptance for pause/restart/reconnect, recovery progress, switched backend, and actionable blocked state in `tests/acceptance/recovery.spec.ts`
+- [x] T058 [P] [US4] Add checkpoint compatibility, completeness, hash, and backend-neutrality contract tests in `tests/contract/checkpoint.test.ts`
+- [x] T059 [P] [US4] Add crash-matrix integration tests before/during/after effect and outbox boundaries in `tests/recovery/effect-crash-matrix.test.ts`
+- [x] T060 [P] [US4] Add restart, lease-expiry, stale-fencing, missing/corrupt checkpoint, and unknown-outcome tests in `tests/recovery/runtime-recovery.test.ts`
+- [x] T061 [P] [US4] Add cross-backend continuation tests proving stable specialist/task identities and no duplicated normalized work in `tests/recovery/backend-switch.test.ts`
+- [x] T062 [P] [US4] Add browser acceptance for pause/restart/reconnect, recovery progress, switched backend, and actionable blocked state in `tests/acceptance/recovery.spec.ts`
 
 ### Implementation for User Story 4
 
-- [ ] T063 [US4] Implement versioned provider-neutral checkpoint creation, validation, and compatibility handling in `apps/control-plane/src/application/recovery/checkpoints.ts`
-- [ ] T064 [US4] Implement heartbeat loss detection, monotonic fencing, lease expiry, and stale-runtime rejection in `apps/control-plane/src/scheduler/recovery.ts`
-- [ ] T065 [US4] Implement effect ground-truth reconciliation and bounded `UNKNOWN` blocking semantics in `apps/control-plane/src/application/recovery/reconciliation.ts`
-- [ ] T066 [US4] Implement startup reconstruction, projection catch-up, durable queue resumption, and safe paused-state restoration in `apps/control-plane/src/bootstrap/recovery.ts`
-- [ ] T067 [US4] Implement capability-compatible route selection and continuation on the second fake connection from a compiled checkpoint in `apps/control-plane/src/scheduler/backend-switch.ts`
-- [ ] T068 [US4] Run the independent US4 crash/restart/switch tests and record boundary, fencing, reconciliation, identity, and effect-ledger evidence in `evidence/001-supervised-autonomous-loop/us4/manifest.json`
+- [x] T063 [US4] Implement versioned provider-neutral checkpoint creation, validation, and compatibility handling in `apps/control-plane/src/application/recovery/checkpoints.ts`
+- [x] T064 [US4] Implement heartbeat loss detection, monotonic fencing, lease expiry, and stale-runtime rejection in `apps/control-plane/src/scheduler/recovery.ts`
+- [x] T065 [US4] Implement effect ground-truth reconciliation and bounded `UNKNOWN` blocking semantics in `apps/control-plane/src/application/recovery/reconciliation.ts`
+- [x] T066 [US4] Implement startup reconstruction, projection catch-up, durable queue resumption, and safe paused-state restoration in `apps/control-plane/src/bootstrap/recovery.ts`
+- [x] T067 [US4] Implement capability-compatible route selection and continuation on the second fake connection from a compiled checkpoint in `apps/control-plane/src/scheduler/backend-switch.ts`
+- [x] T068 [US4] Run the independent US4 crash/restart/switch tests and record boundary, fencing, reconciliation, identity, and effect-ledger evidence in `evidence/001-supervised-autonomous-loop/us4/manifest.json`
 
 **Checkpoint**: US4 is independently accepted; interruption cannot erase authoritative state or
 blindly duplicate an uncertain effect.

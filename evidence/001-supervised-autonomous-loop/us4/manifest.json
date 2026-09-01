@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "1.0",
+  "feature": "001-supervised-autonomous-loop",
+  "checkpoint": "US4_RECOVER_WITHOUT_LOSS_OR_DUPLICATION",
+  "generatedAt": "2026-09-01T17:25:37Z",
+  "scope": {
+    "tasks": [
+      "T058",
+      "T059",
+      "T060",
+      "T061",
+      "T062",
+      "T063",
+      "T064",
+      "T065",
+      "T066",
+      "T067",
+      "T068"
+    ],
+    "excludedFromThisCheckpoint": "T069+"
+  },
+  "revisions": {
+    "us3Base": "65c5b8462282e277cc54c2fd3695ac4ef55b8d6d",
+    "implementation": "dc766b2f0b92d115c45a370009005641217ad14b"
+  },
+  "environment": {
+    "node": "24.20.0",
+    "pnpm": "11.24.0",
+    "postgresql": "18.4 embedded loopback fixture",
+    "browser": "Playwright 1.62.1 Chromium"
+  },
+  "validation": [
+    {
+      "command": "pnpm exec vitest run tests/recovery/control-plane-restart.test.ts tests/recovery/backend-switch.test.ts tests/recovery/effect-crash-matrix.test.ts tests/recovery/runtime-recovery.test.ts --config vitest.config.ts",
+      "result": "PASS",
+      "evidence": "4 recovery files and 27 tests passed across control-plane restart, runtime loss, effect crash boundaries, fencing, reconciliation, and backend continuation."
+    },
+    {
+      "command": "pnpm clean && pnpm validate",
+      "result": "PASS",
+      "evidence": "Format, lint and boundaries, lockfile integrity, immutable image pins, secret scan, typecheck, 91 unit tests, 71 contract tests, and 110 integration tests passed."
+    },
+    {
+      "command": "pnpm test:acceptance",
+      "result": "PASS",
+      "evidence": "19 of 19 Chromium tests passed, including pause, restart, reconnect, recovery progress, backend switch, approval-required replay, and actionable blocked recovery states."
+    },
+    {
+      "command": "pnpm --filter @moonshift/web build",
+      "result": "PASS",
+      "evidence": "Vite production build completed successfully."
+    },
+    {
+      "command": "pnpm contracts:generate",
+      "result": "PASS",
+      "evidence": "Contract derivatives generated successfully from the approved schemas."
+    },
+    {
+      "command": "node scripts/generate-contract-types.mjs --check",
+      "result": "PASS",
+      "evidence": "Generated TypeScript derivatives reproduce from the approved OpenAPI and runner protocol contracts."
+    },
+    {
+      "command": "git diff --check",
+      "result": "PASS",
+      "evidence": "No whitespace errors."
+    },
+    {
+      "command": "$speckit-converge bounded to T058-T068",
+      "result": "PASS",
+      "evidence": "All five US4 acceptance scenarios, FR-023 through FR-029, FR-035, SC-002, SC-005, and SC-008 align across the specification, plan, tasks, contracts, implementation, tests, and evidence; no task was appended and T069+ was not evaluated as current work."
+    }
+  ],
+  "checkpointEvidence": {
+    "contract": "Versioned, complete, provider-neutral checkpoints are schema-validated, deep-frozen, and integrity-bound by a deterministic SHA-256 material hash.",
+    "contents": "Objective, acceptance criteria, task state, decisions, open questions, repository and diff state, tool results, artifacts, evidence, remaining work, context manifest, budget, lease, and effect reconciliation state are required reconstruction inputs.",
+    "compatibility": "Unsupported versions, incomplete state, invalid hashes, corrupt material, missing checkpoints, and sequence gaps fail closed into an actionable recovery block.",
+    "backendNeutrality": "Provider and harness session identifiers are optional hints only and are excluded from reconstruction authority."
+  },
+  "crashBoundaryEvidence": {
+    "boundaries": [
+      "BEFORE_EFFECT_INTENT_COMMIT",
+      "AFTER_INTENT_COMMIT_BEFORE_RUNNER_DISPATCH",
+      "AFTER_DISPATCH_BEFORE_FIXTURE_MUTATION",
+      "AFTER_FIXTURE_MUTATION_BEFORE_RUNNER_RESULT",
+      "AFTER_RUNNER_RESULT_BEFORE_APPLIED_COMMIT",
+      "AFTER_EFFECT_COMMIT_BEFORE_OUTBOX_PUBLICATION",
+      "AFTER_OUTBOX_PUBLICATION_BEFORE_BROWSER_ACKNOWLEDGEMENT"
+    ],
+    "result": "Every scripted boundary preserves committed authoritative state and dispatches no recovery-side effect blindly; durable publication and browser delivery converge without a second semantic effect."
+  },
+  "fencingEvidence": {
+    "lossDetection": "Durable runtime heartbeats are compared with PostgreSQL authority time, and expired owners are recovered after the configured lease interval.",
+    "authorityTuple": "Effect authority is validated against the exact owner, lease, execution, and fencing-token tuple.",
+    "successorAuthority": "Recovery revokes the old lease and mints a monotonically greater fencing token before successor scheduling.",
+    "lateSourceRejection": "Late calls from the lost runtime are rejected after successor authority is durable."
+  },
+  "effectReconciliationEvidence": {
+    "durablePrepare": "Intent, approval, semantic idempotency key, effect identity, and execution authority are committed before remote fixture invocation.",
+    "transactionBoundary": "Remote continuation and effect lookup execute outside PostgreSQL transactions; durable finalization is replayable with stable identities.",
+    "groundTruth": "Bounded lookup classifies APPLIED, NOT_APPLIED, or UNKNOWN after revoking lost-runtime authority.",
+    "applied": "APPLIED resumes only after the effect boundary and records the observed completed result without redispatch.",
+    "notApplied": "NOT_APPLIED re-plans before the effect; an uncertain prior attempt receives a fresh approval and effect attempt identity while retaining the same semantic key.",
+    "unknown": "UNKNOWN remains blocked for supervisor attention after bounded lookup rather than retrying blindly."
+  },
+  "identityAndBackendEvidence": {
+    "stableAuthority": "Project, task, and specialist identities survive recovery unchanged; a successor execution and runtime receive fresh authority.",
+    "route": "A second capability-compatible fake connection continues from the compiled provider-neutral checkpoint.",
+    "resultValidation": "Only a successful CLAIMED_COMPLETE continuation with an APPLIED tool result and deterministic artifact may grant successor continuation authority.",
+    "parity": "Recovered continuation retains the normalized work hash and deterministic artifact outcome of the uninterrupted fixture journey."
+  },
+  "restartAndDeliveryEvidence": {
+    "reconstruction": "PostgreSQL snapshots and ordered durable events reconstruct authoritative identities, approvals, effects, artifacts, evidence, checkpoints, and audit state.",
+    "queue": "Expired queue claims are released, durable lease state is synchronized, and only safe non-paused work is made eligible for successor scheduling.",
+    "outbox": "The production consumer uses claim, projection apply, checkpoint advance, and ACK phases with expired-claim recovery and idempotent replay.",
+    "projection": "Projection checkpoints catch up ordered events without duplicate application after restart or reconnect.",
+    "safeControlState": "PAUSED projects remain paused after restart; missing, corrupt, incompatible, or gapped checkpoint state becomes actionable BLOCKED_RECOVERY.",
+    "startupFailureIsolation": "A missing compatible secondary connection is persisted as BLOCKED_RECOVERY without preventing the control plane from becoming ready."
+  },
+  "independentReview": {
+    "rounds": [
+      "us4_review",
+      "us4_final_review",
+      "us4_final_review_2",
+      "us4_final_review_3",
+      "us4_final_review_4"
+    ],
+    "repairs": "Review drove separation of backend planning from completion, strict successful-continuation validation, fresh approval after a reconciled non-applied uncertain attempt, fail-closed backend error persistence, and startup isolation when no compatible secondary exists.",
+    "finalResult": "PASS_NO_SUBSTANTIVE_FINDINGS",
+    "reviewedRisks": "Checkpoint completeness and integrity, restart reconstruction, PostgreSQL outbox recovery, heartbeat expiry, monotonic fencing, stale authority, effect reconciliation, transaction boundaries, semantic replay, backend-switch identity, result truthfulness, browser recovery, scope, and secret safety."
+  },
+  "safety": {
+    "realProviderUsed": false,
+    "providerCredentialUsed": false,
+    "unrestrictedShellUsed": false,
+    "externalNetworkEffectPerformed": false,
+    "simulatedSensitiveFixtureEffectPerformed": true,
+    "realSensitiveEffectPerformed": false,
+    "productionMutationPerformed": false,
+    "remoteGitMutationPerformed": false,
+    "recoveryClaimed": true
+  }
+}
