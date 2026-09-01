@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0",
+  "profile": "foundation-16gb-pve-evaluation",
+  "classification": "FIXTURE_EVIDENCE_TARGET",
+  "host": {
+    "memoryBytes": 17179869184,
+    "gpuRequired": false
+  },
+  "controlPlane": {
+    "memoryEnvelopeBytes": 3221225472,
+    "cognitiveRunsDefault": 3,
+    "cognitiveRunsMaximum": 5
+  },
+  "runner": {
+    "profile": "FIXTURE_PROCESS",
+    "jobsMaximum": 1,
+    "memoryEnvelopeBytes": 6442450944,
+    "networkMode": "DENY",
+    "gpuUnits": 0,
+    "arbitraryShell": false
+  },
+  "storage": {
+    "backupTemporaryBytesMaximum": 8589934592,
+    "restoreTemporaryBytesMaximum": 8589934592
+  },
+  "goals": {
+    "eventVisibilityP95MsAtThree": 2000,
+    "eventVisibilityP95MsAtFive": 5000,
+    "commandDurabilityP95Ms": 2000,
+    "restartInspectionMs": 60000
+  }
+}

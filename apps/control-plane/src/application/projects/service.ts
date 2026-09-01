@@ -441,7 +441,7 @@ export class ProjectService {
               capacity.activeCognitiveRuns +
               this.dependencies.scheduler.activeCognitiveRuns +
               (waitsForCapacity ? 0 : 1),
-            cognitiveRunLimit: DEFAULT_POLICY_PROFILE.cognitiveConcurrency.default,
+            cognitiveRunLimit: this.dependencies.scheduler.cognitiveRunLimit,
             activeRunnerJobs:
               capacity.activeRunnerJobs + this.dependencies.scheduler.activeRunnerJobs,
             runnerJobLimit: 1 as const,

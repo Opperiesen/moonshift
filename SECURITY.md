@@ -14,4 +14,14 @@ Include only the minimum reproducible information needed to assess the issue: af
 
 The constitution requires least privilege, separation between the control plane and execution runner, credential isolation, policy-gated sensitive actions, durable audit events, idempotent effects, and reconciliation after failures. Threat modeling includes prompt injection, malicious dependencies, secret access, privilege escalation, cross-project contamination, compromised model output, destructive Git operations, unauthorized egress, approval spoofing, and audit tampering.
 
-These are project requirements and design targets, not a claim that they are already implemented. Security-sensitive changes must include targeted validation and independent review.
+The current implementation is a fixture-only local evaluation. The exercised runner boundary uses
+owner-local TLS 1.3 mutual authentication, rejects replayed/revoked/mismatched/plaintext messages,
+denies network and arbitrary shell, and does not accept provider credentials. The control-plane and
+runner remain separate processes, and durable policy, audit, idempotency, artifact-integrity, and
+recovery checks are covered by the active test suites.
+
+These controls do not claim OCI isolation, hostile-workload protection, real provider authentication,
+unrestricted repository execution, public-network hardening, production backup scheduling, or general
+retention/deletion. The fixture backup/restore contract and local operating limits are documented in
+[`docs/operations/`](docs/operations/); the contract is not evidence that a production backup service
+exists. Security-sensitive changes must include targeted validation and independent review.

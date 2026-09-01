@@ -22,10 +22,12 @@ export interface FixtureSchedulerOptions {
   readonly activeSpecialists?: number;
   readonly activeCognitiveRuns?: number;
   readonly activeRunnerJobs?: number;
+  readonly cognitiveRunLimit?: number;
 }
 
 export class FixtureScheduler {
   readonly expectedRevision: string;
+  readonly cognitiveRunLimit: number;
   private capacity: {
     activeSpecialists: number;
     activeCognitiveRuns: number;
@@ -34,6 +36,15 @@ export class FixtureScheduler {
 
   constructor(private readonly options: FixtureSchedulerOptions) {
     this.expectedRevision = options.expectedRevision;
+    this.cognitiveRunLimit =
+      options.cognitiveRunLimit ?? DEFAULT_POLICY_PROFILE.cognitiveConcurrency.default;
+    if (
+      !Number.isSafeInteger(this.cognitiveRunLimit) ||
+      this.cognitiveRunLimit < 1 ||
+      this.cognitiveRunLimit > DEFAULT_POLICY_PROFILE.cognitiveConcurrency.maximum
+    ) {
+      throw new RangeError('Fixture cognitive run limit is outside the constitutional ceiling');
+    }
     this.capacity = {
       activeSpecialists: options.activeSpecialists ?? 0,
       activeCognitiveRuns: options.activeCognitiveRuns ?? 0,
@@ -183,7 +194,7 @@ export class FixtureScheduler {
     });
     const queueReason =
       this.activeCognitiveRuns + (input.capacity?.activeCognitiveRuns ?? 0) >=
-      DEFAULT_POLICY_PROFILE.cognitiveConcurrency.default
+      this.cognitiveRunLimit
         ? ('COGNITIVE_CAPACITY' as const)
         : this.activeRunnerJobs + (input.capacity?.activeRunnerJobs ?? 0) >= 1
           ? ('RUNNER_CAPACITY' as const)

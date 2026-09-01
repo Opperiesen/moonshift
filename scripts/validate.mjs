@@ -10,6 +10,9 @@ const commands = [
   ['pnpm', ['test:unit']],
   ['pnpm', ['test:contract']],
   ['pnpm', ['test:integration']],
+  ['pnpm', ['test:recovery']],
+  ['pnpm', ['test:security']],
+  ['pnpm', ['test:capacity']],
 ];
 for (const [command, args] of commands) execFileSync(command, args, { stdio: 'inherit' });
 console.log('validation complete; browser artifacts are written under test-results/');

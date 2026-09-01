@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0",
+  "kind": "MOONSHIFT_EVALUATION_HOST_PROFILE",
+  "name": "proxmox-ve-16gb-fixture",
+  "observabilityProfile": "config/observability/reference-capacity.json",
+  "host": {
+    "hypervisor": "Proxmox VE",
+    "guestOs": "Linux",
+    "memoryBytes": 17179869184,
+    "cpuArchitecture": "x86_64-or-arm64",
+    "gpuRequired": false
+  },
+  "claims": {
+    "productionDeployment": false,
+    "ociIsolation": false,
+    "realProviderConnectivity": false,
+    "fixtureRunnerJobs": 1,
+    "networkMode": "DENY",
+    "arbitraryShell": false
+  },
+  "failClosed": [
+    "requested-resource-not-enforceable",
+    "runner-job-limit-exceeded",
+    "network-denial-unavailable",
+    "nonzero-gpu-request",
+    "restore-not-validated"
+  ]
+}

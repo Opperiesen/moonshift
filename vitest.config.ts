@@ -11,9 +11,12 @@ export default defineConfig({
       {
         test: {
           name: 'integration',
-          include: ['tests/integration/**/*.test.ts', 'tests/recovery/**/*.test.ts'],
+          include: ['tests/integration/**/*.test.ts'],
         },
       },
+      { test: { name: 'recovery', include: ['tests/recovery/**/*.test.ts'] } },
+      { test: { name: 'security', include: ['tests/security/**/*.test.ts'] } },
+      { test: { name: 'performance', include: ['tests/performance/**/*.test.ts'] } },
     ],
   },
 });

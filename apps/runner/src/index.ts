@@ -1,6 +1,7 @@
 export * from './client.js';
 export * from './fixture-executor.js';
 export * from './fixture/effects.js';
+export * from './instrumentation.js';
 export * from './journal.js';
 export * from './leases.js';
 export * from './resources.js';

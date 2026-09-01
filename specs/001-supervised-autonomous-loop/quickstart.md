@@ -1,8 +1,7 @@
 # Quickstart Validation: Supervised Autonomous Loop
 
-**Status**: Post-implementation acceptance contract. The commands and application described here do
-not exist in Iteration 0; implementing them is tracked in [tasks.md](tasks.md). This guide must become
-runnable before the feature can be declared complete.
+**Status**: Runnable fixture-evaluation guide. The complete journey is driven by the repository's
+deterministic Vitest and Playwright harnesses; no production installation or lifecycle CLI is claimed.
 
 ## What this proves
 
@@ -30,19 +29,19 @@ untrusted repository.
 
 ## Fresh local setup
 
-From the repository root after the setup/foundation implementation tasks are complete:
+From the repository root:
 
 ```bash
 corepack enable
 pnpm install --frozen-lockfile
 pnpm contracts:validate
-pnpm moonshift init --profile fixture --bind 127.0.0.1
-pnpm moonshift up --profile fixture
-pnpm moonshift doctor --profile fixture
-pnpm moonshift open --profile fixture
+pnpm typecheck
+pnpm test:runner
+pnpm test:acceptance
 ```
 
-Expected `doctor` result:
+The test harness starts only test-owned, loopback services and shuts them down after each suite. The
+runner-process and browser suites prove the equivalent local readiness facts:
 
 - control plane, PostgreSQL, artifact store, fixture runner, and both fake backend connections healthy;
 - loopback-only bind confirmed;
@@ -52,11 +51,10 @@ Expected `doctor` result:
 - no credential reference configured;
 - zero active project or effect before the journey.
 
-`moonshift up` prints only the loopback base URL and never session material. `moonshift open` creates
-a short-lived one-time bootstrap secret in owner-only local state, opens the browser with that secret
-in a URL fragment, exchanges it for a host-only HttpOnly session, and immediately removes the
-fragment. The bootstrap must fail when reused, expired, presented with the wrong Origin, or served
-from a non-loopback bind.
+The browser harness creates a short-lived fixture bootstrap secret, presents it in a URL fragment,
+exchanges it for a host-only HttpOnly session, and immediately removes the fragment. The bootstrap
+tests fail reuse, expiry, wrong Origin, and non-loopback configuration. Secrets are fixed test data and
+are never reusable credentials.
 
 The fixture runner uses a separate loopback TLS 1.3 listener with owner-local per-instance mutual-TLS
 identity. Its private keys are never printed. Before the journey, the process test must prove that an
@@ -107,14 +105,19 @@ Run the complete deterministic suite:
 pnpm test:unit
 pnpm test:contract
 pnpm test:integration
-pnpm test:acceptance -- --scenario PASS
-pnpm test:acceptance -- --scenario EVIDENCE_FAIL
-pnpm test:acceptance -- --scenario APPROVAL_REJECT
+pnpm test:runner
+pnpm test:acceptance
 pnpm test:recovery
+pnpm test:crash-matrix
 pnpm test:security
-pnpm test:capacity -- --cognitive-runs 3
-pnpm test:capacity -- --cognitive-runs 5
+pnpm test:migration
+pnpm test:restore
+pnpm test:capacity
 ```
+
+The browser suite contains passing, evidence-failure, approval-rejection, pause/interlock, recovery,
+and Results scenarios. The capacity suite runs one, three, and five cognitive executions in one
+invocation and records its aggregate metrics under test-owned `test-results/`.
 
 Required results:
 
@@ -160,27 +163,26 @@ after effect commit / before outbox publication
 after outbox publication / before browser acknowledgement
 ```
 
-For every point, restart the relevant process, run reconciliation, replay the event projection, and
-assert a single semantic effect and complete audit causality. An indeterminate fixture ledger must
-leave the effect `UNKNOWN`/reconciling and block supervisor attention; it must not retry blindly.
+Run `pnpm test:crash-matrix` for the effect boundaries and `pnpm test:recovery` for the complete
+restart/reconciliation suite. For every point, the tests restart the relevant boundary, run
+reconciliation, replay the event projection, and assert a single semantic effect and complete audit
+causality. An indeterminate fixture ledger must leave the effect `UNKNOWN`/reconciling and block
+supervisor attention; it must not retry blindly.
 
 ## Backup and restore exercise
 
-With the passing project complete:
+Run the fixture-owned migration and restore exercise:
 
 ```bash
-pnpm moonshift backup --profile fixture --output .moonshift-test/backup
-pnpm moonshift stop --profile fixture
-pnpm moonshift restore --profile fixture-restore --input .moonshift-test/backup
-pnpm moonshift up --profile fixture-restore
-pnpm test:restore -- --expected-project-from .moonshift-test/backup/manifest.json
+pnpm test:migration
+pnpm test:restore
 ```
 
 The restored instance must validate the manifest, schema version, and artifact hashes; reconstruct the
 same result and audit projection; and keep scheduling stopped until validation succeeds. The test
 records final backup size, temporary backup/restore working-space high-water marks, and scheduling
 downtime through validated projection rebuild against the declared reference disk envelope. The test
-teardown removes only the test-owned `.moonshift-test/` directory through the project cleanup command.
+teardown removes only the temporary directories created by the tests.
 
 ## Evidence bundle
 
@@ -200,9 +202,9 @@ machine-specific credential path.
 ## Teardown
 
 ```bash
-pnpm moonshift stop --profile fixture
-pnpm moonshift fixture clean --profile fixture
+pnpm clean
 ```
 
-Teardown must refuse to remove a path not created and recorded by the fixture profile. It preserves the
-evidence bundle selected by the tester unless the tester explicitly uses the fixture cleanup option.
+The command removes only repository-generated build, coverage, Playwright, and test-result output.
+Every fixture suite separately removes its own temporary PostgreSQL, artifact, runner, and browser
+state. Copy any evidence report that must be retained before running `pnpm clean`.

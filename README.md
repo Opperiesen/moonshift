@@ -22,7 +22,17 @@ Project foundations and the staged roadmap live in [`docs/feature-map.md`](docs/
 
 Moonshift uses GitHub Spec Kit as its first development method. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contribution workflow and [`AGENTS.md`](AGENTS.md) for repository rules. Normative specifications, plans, tasks, and decision records remain versioned in Git.
 
-There is no supported installation or production quickstart yet. Follow the active Spec Kit artifacts and task state rather than inferring commands from this overview.
+There is no supported installation or production deployment yet. The repository does provide an
+implementation-local evaluation path: use Node.js 24.x and the pinned pnpm 11.24.0 toolchain,
+install from the lockfile, and run the package scripts documented in
+[`docs/operations/local-evaluation.md`](docs/operations/local-evaluation.md). This path exercises
+controlled fixtures and disposable/local PostgreSQL only; it does not authenticate with a provider,
+run arbitrary repository shell commands, or expose a production service.
+
+Operational contracts and boundaries are documented in
+[`docs/operations/`](docs/operations/), including the fixture backup/restore contract. The CLI,
+backup scheduler, production deployment, and general retention policy are not shipped capabilities
+unless an implementation and revision-bound evidence say otherwise.
 
 ## Security and licensing
 

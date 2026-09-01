@@ -5,6 +5,7 @@ import { X509Certificate } from 'node:crypto';
 import { planningValidators } from '@moonshift/contracts';
 
 import { FixtureEffectLedger, FixtureProcessExecutor } from './fixture-executor.js';
+import { collectProcessResourceSnapshot } from './instrumentation.js';
 import { FixtureRunnerJournal, type RunnerJournalFileSystem } from './journal.js';
 import { FixtureLeaseRegistry, type FixtureLeaseOffer } from './leases.js';
 import {
@@ -487,6 +488,17 @@ export class FixtureRunnerServer {
       profile: 'FIXTURE_PROCESS',
       capabilities: this.capacity,
       runtimeDiscovery: fixtureRuntimeDiscovery(),
+    });
+  }
+
+  resourceSnapshot() {
+    return Object.freeze({
+      process: collectProcessResourceSnapshot(this.options.now()),
+      runner: Object.freeze({
+        activeJobs: this.activeExecutions.size,
+        maxJobs: this.capacity.maxJobs,
+        capacity: this.capacity,
+      }),
     });
   }
 
