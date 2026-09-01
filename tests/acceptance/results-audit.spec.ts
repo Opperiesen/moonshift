@@ -14,6 +14,7 @@ test.beforeAll(async () => {
   await controlPlane.server.listen({ host: '127.0.0.1', port: 4316 });
   vite = await createViteServer({
     root: 'apps/web',
+    cacheDir: 'node_modules/.vite-acceptance-results-audit',
     logLevel: 'silent',
     server: {
       host: '127.0.0.1',

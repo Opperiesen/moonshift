@@ -103,11 +103,30 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
   }, 120_000);
 
   afterAll(async () => {
-    await Promise.all([...journeyPools.values()].map(async (pool) => pool.end()));
-    await sourcePool?.end();
-    await restorePool?.end();
-    await embedded?.stop();
-    if (testRoot !== undefined) await rm(testRoot, { recursive: true, force: true });
+    const pools = [...journeyPools.values(), sourcePool, restorePool].filter(
+      (pool): pool is Pool => pool !== undefined,
+    );
+    const shutdownErrors: Array<{ readonly code: unknown; readonly whileStopping: boolean }> = [];
+    let stoppingEmbedded = false;
+    const recordShutdownError = (error: Error): void => {
+      shutdownErrors.push({
+        code: 'code' in error ? error.code : undefined,
+        whileStopping: stoppingEmbedded,
+      });
+    };
+    for (const pool of pools) pool.on('error', recordShutdownError);
+    try {
+      await Promise.all(pools.map(async (pool) => pool.end()));
+      stoppingEmbedded = true;
+      await embedded?.stop();
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(shutdownErrors).toEqual(
+        shutdownErrors.map(() => ({ code: '57P01', whileStopping: true })),
+      );
+    } finally {
+      for (const pool of pools) pool.off('error', recordShutdownError);
+      if (testRoot !== undefined) await rm(testRoot, { recursive: true, force: true });
+    }
   }, 120_000);
 
   it('meets one/three/five execution, durability, recovery, and storage envelopes', async () => {
