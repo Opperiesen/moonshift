@@ -1503,7 +1503,7 @@ describe.sequential('fixture runner authenticated boundary', () => {
       version: 1,
       processedMessageIds: [],
     });
-    expect((await import('node:fs/promises')).readdir(stateDirectory)).resolves.not.toContain(
+    await expect((await import('node:fs/promises')).readdir(stateDirectory)).resolves.not.toContain(
       expect.stringContaining('.tmp'),
     );
   });

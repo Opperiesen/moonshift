@@ -1032,7 +1032,19 @@ describe.sequential('PostgreSQL supervised sensitive-work journey', () => {
   });
 
   it('revokes an authenticated runner effect in flight and reconciles UNKNOWN before stop', async () => {
-    const approvingPlane = fixture('us2-inflight-approval');
+    const effectReturned = deferred();
+    const effectApplied = deferred();
+    const approvingEffects: ApprovedEffectExecutor = {
+      execute: async (input) => {
+        const result = await effects.execute(input);
+        effectApplied.resolve();
+        await effectReturned.promise;
+        return result;
+      },
+      revoke: (input) => effects.revoke(input),
+      lookup: (input) => effects.lookup(input),
+    };
+    const approvingPlane = fixture('us2-inflight-approval', approvingEffects);
     const stoppingPlane = fixture('us2-inflight-stop');
     const created = await submit(approvingPlane, '27');
     const approval = (await approvingPlane.supervision.getProjection(created.view.projectId))
@@ -1049,6 +1061,7 @@ describe.sequential('PostgreSQL supervised sensitive-work journey', () => {
       idempotencyKey: 'us2-inflight-approval-27',
       correlationId: '62000000-0000-4000-8000-000000000027',
     });
+    await effectApplied.promise;
     const executing = await waitForEffectState(stoppingPlane, created.view.projectId, 'EXECUTING');
     const stopped = stoppingPlane.supervision.controlProject({
       actorId: supervisorId,
@@ -1059,8 +1072,11 @@ describe.sequential('PostgreSQL supervised sensitive-work journey', () => {
       idempotencyKey: 'us2-inflight-stop-27',
       correlationId: '62000000-0000-4000-8000-000000000028',
     });
-    const outcomes = await Promise.allSettled([decision, stopped]);
-    expect(outcomes[1]).toMatchObject({ status: 'fulfilled' });
+    const [stopOutcome] = await Promise.allSettled([stopped]);
+    effectReturned.resolve();
+    const [decisionOutcome] = await Promise.allSettled([decision]);
+    expect(stopOutcome).toMatchObject({ status: 'fulfilled' });
+    expect(decisionOutcome).toMatchObject({ status: 'fulfilled' });
     const projection = await stoppingPlane.supervision.getProjection(created.view.projectId);
     expect(projection).toMatchObject({
       projectState: 'STOPPED',
