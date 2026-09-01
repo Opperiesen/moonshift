@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="320" viewBox="0 0 1200 320" role="img" aria-labelledby="title description">
+  <title id="title">Moonshift</title>
+  <desc id="description">Supervised autonomy for software development</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07111f"/>
+      <stop offset="0.58" stop-color="#131338"/>
+      <stop offset="1" stop-color="#24164f"/>
+    </linearGradient>
+    <linearGradient id="moon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#a78bfa"/>
+    </linearGradient>
+    <linearGradient id="shift" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#8b5cf6"/>
+      <stop offset="1" stop-color="#22d3ee"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="320" rx="26" fill="url(#background)"/>
+  <circle cx="1080" cy="52" r="120" fill="#7c3aed" opacity=".10"/>
+  <circle cx="1010" cy="300" r="190" fill="#0891b2" opacity=".07"/>
+  <g fill="#e2e8f0">
+    <circle cx="70" cy="58" r="1.5" opacity=".75"/>
+    <circle cx="203" cy="42" r="1" opacity=".55"/>
+    <circle cx="1090" cy="215" r="1.5" opacity=".65"/>
+    <circle cx="1140" cy="92" r="1" opacity=".55"/>
+    <circle cx="940" cy="55" r="1" opacity=".45"/>
+    <circle cx="820" cy="268" r="1.5" opacity=".35"/>
+  </g>
+
+  <g transform="translate(86 62)">
+    <circle cx="96" cy="96" r="68" fill="url(#moon)" filter="url(#glow)" opacity=".95"/>
+    <circle cx="126" cy="72" r="68" fill="#10112f"/>
+    <path d="M46 118h83l-18-18 12-12 39 39-39 39-12-12 18-18H46z" fill="url(#shift)"/>
+  </g>
+
+  <g font-family="Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif">
+    <text x="310" y="134" fill="#f8fafc" font-size="72" font-weight="750" letter-spacing="7">MOONSHIFT</text>
+    <text x="314" y="178" fill="#cbd5e1" font-size="24" font-weight="450" letter-spacing="1">SUPERVISED AUTONOMY FOR SOFTWARE DEVELOPMENT</text>
+    <g transform="translate(314 216)" font-size="13" font-weight="650" letter-spacing="1.3">
+      <rect width="128" height="34" rx="17" fill="#8b5cf6" opacity=".18" stroke="#a78bfa" stroke-opacity=".6"/>
+      <text x="64" y="22" text-anchor="middle" fill="#ddd6fe">SELF-HOSTED</text>
+      <rect x="144" width="194" height="34" rx="17" fill="#06b6d4" opacity=".14" stroke="#22d3ee" stroke-opacity=".55"/>
+      <text x="241" y="22" text-anchor="middle" fill="#a5f3fc">PROVIDER-AGNOSTIC</text>
+      <rect x="354" width="179" height="34" rx="17" fill="#f8fafc" opacity=".07" stroke="#cbd5e1" stroke-opacity=".35"/>
+      <text x="443.5" y="22" text-anchor="middle" fill="#e2e8f0">EVIDENCE-DRIVEN</text>
+    </g>
+  </g>
+</svg>

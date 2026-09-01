@@ -1,26 +1,72 @@
 # Contributing to Moonshift
 
-Moonshift is in pre-implementation alpha. Contributions should help establish a small, testable self-hosted system rather than assume that planned integrations or interfaces already exist.
+Moonshift is an early alpha with a working deterministic foundation and an intentionally staged
+roadmap. Contributions are welcome when they preserve its one-supervisor, self-hosted,
+provider-agnostic, evidence-driven design.
 
-## Before changing the repository
+## Start here
 
-Read the [constitution](.specify/memory/constitution.md), the active feature specification and plan, its `tasks.md`, and any applicable checklists or analysis. The task file is the execution source of truth: respect dependencies, `[P]` markers, and existing checked state. If the relevant Spec Kit artifacts are missing or inconsistent, record that as a documentation task before implementing around it.
+Before changing the repository, read:
 
-Use English for normative project artifacts, source code, and public documentation. Keep the change bounded to the feature or task being addressed, and preserve unrelated local work.
+1. the [constitution](.specify/memory/constitution.md);
+2. the [current work handoff](docs/development/current-work.md);
+3. the active feature's `spec.md`, `plan.md`, `tasks.md`, contracts, and checklists;
+4. the repository rules in [`AGENTS.md`](AGENTS.md).
 
-## Development method
+Spec Kit artifacts are durable project state. The applicable `tasks.md` is authoritative for task
+completion, and an accepted requirement must not be changed merely to fit an implementation.
 
-GitHub Spec Kit is Moonshift's first development method. The normal lifecycle is constitution alignment, specification, clarification when needed, requirements-quality checks, planning and research, task decomposition, cross-artifact analysis, bounded implementation, deterministic verification, and convergence. Follow the repository's installed Spec Kit integration and active artifacts for the exact commands; this document intentionally does not invent a command line or installation procedure.
+Use English for normative artifacts, code, tests, issues, and public documentation. Keep changes
+bounded, preserve unrelated work, and do not present planned integrations as shipped support.
 
-Do not begin production implementation before the applicable specification, plan, tasks, and required quality gates are ready. Prefer a deterministic fake backend before real provider or harness integrations. Keep model APIs and coding harnesses as separate backend families, and do not let provider-specific types become domain contracts.
+## Local validation
 
-## Pull requests and review
+Use Node.js `24.x` with the pinned pnpm `11.24.0` toolchain:
 
-Describe the user-visible or repository-facing behavior, the bounded scope, relevant Spec Kit task IDs, validation performed, and any unresolved decision. Include evidence tied to the relevant revision where the change affects behavior. Security, authorization, persistence, concurrency, runner isolation, public contracts, or other cross-cutting changes require independent review under the constitution.
+```bash
+corepack enable
+pnpm install --frozen-lockfile
+pnpm validate
+pnpm exec playwright install --with-deps chromium
+pnpm test:acceptance
+```
 
-Do not claim an integration or legal usage mode is supported without current documentation, an explicit compatibility review, and the applicable conformance evidence. Never add credentials or private model reasoning to source, logs, tests, or artifacts.
+`pnpm validate` runs formatting, lint and dependency-boundary checks, lockfile and Compose image
+checks, the credential-like material scan, typechecking, and deterministic unit, contract,
+integration, recovery, security, and capacity suites. The browser suite is a separate gate. More
+detail is available in the [local evaluation guide](docs/operations/local-evaluation.md).
 
-The open-source license remains a human decision. Until that decision, this file documents the
-future contribution workflow but does not invite broad external code intake or grant reuse rights.
-See [`docs/decisions/0004-open-source-license-options.md`](docs/decisions/0004-open-source-license-options.md)
-for the comparison and interim rule.
+No provider, harness, subscription, or user credential is required for the current fixture-only
+implementation. Never add credentials, tokens, cookies, authentication caches, private keys, or
+private model reasoning to code, fixtures, logs, issues, or artifacts.
+
+## Proposing a change
+
+- Use the issue forms for reproducible bugs and bounded feature proposals.
+- For a substantial change, align on the problem and scope before implementation.
+- Follow the installed Spec Kit lifecycle at a depth proportionate to risk.
+- Prefer a deterministic fake backend before a real provider or harness integration.
+- Keep model APIs and coding harnesses as distinct backend families.
+- Do not claim a provider or authentication mode is supported without a current compatibility review
+  and conformance evidence.
+
+## Pull requests
+
+A pull request should state:
+
+- the problem and bounded outcome;
+- relevant Spec Kit task or decision IDs;
+- user-visible, contract, security, or migration impact;
+- deterministic validation performed;
+- unresolved decisions or known limitations.
+
+Security, authorization, persistence, concurrency, runner isolation, public-contract, and other
+cross-cutting changes require independent review. Completion claims must be backed by evidence tied
+to the reviewed revision.
+
+By intentionally submitting a contribution for inclusion in Moonshift, you agree that it is provided
+under the [Apache License 2.0](LICENSE), consistent with section 5 of that license, unless you
+conspicuously state otherwise before inclusion.
+
+Please follow the [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md). Report vulnerabilities privately under
+the process in [`SECURITY.md`](SECURITY.md).

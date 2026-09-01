@@ -1,27 +1,47 @@
 # Security policy
 
-Moonshift is currently **pre-publication and pre-implementation alpha**. There is no production service, supported deployment, or public security-response channel yet. Do not include secrets, credentials, cookies, tokens, or private model reasoning in issues, commits, or examples.
+Moonshift is an implementation-local alpha. There is no supported production deployment, public
+service, or stable release yet. Current security claims apply only to the exact fixture profile and
+revision-bound evidence in this repository.
 
 ## Reporting a vulnerability
 
-Once the GitHub repository is public, the planned private reporting path is a **GitHub Security Advisory** addressed privately to the maintainers. Please use that channel for suspected vulnerabilities rather than publishing exploit details in a public issue.
+**Do not open a public issue for a suspected vulnerability.** Use GitHub's
+[private vulnerability reporting form](https://github.com/Opperiesen/moonshift/security/advisories/new)
+so the report and follow-up remain private.
 
-Until publication, do not disclose a suspected vulnerability publicly. If the private advisory path is unavailable, pause disclosure and obtain the project's current private reporting instructions from the maintainers; this document intentionally does not invent an email address or promise a response time.
+Include only the minimum information needed to assess the issue:
 
-Include only the minimum reproducible information needed to assess the issue: affected revision or artifact, impact, reproduction steps, and a suggested mitigation if known. Remove credentials and personal data before sending. Do not test against systems you do not own or have permission to assess.
+- affected revision, component, or artifact;
+- impact and required preconditions;
+- reproducible steps or a minimal proof of concept;
+- a suggested mitigation, if known.
 
-## Security expectations
+Remove credentials, personal data, proprietary code, and private model reasoning before submitting.
+Do not test systems you do not own or have explicit permission to assess. Acknowledgement and repair
+timelines depend on severity and maintainer availability; this alpha does not promise a formal SLA.
 
-The constitution requires least privilege, separation between the control plane and execution runner, credential isolation, policy-gated sensitive actions, durable audit events, idempotent effects, and reconciliation after failures. Threat modeling includes prompt injection, malicious dependencies, secret access, privilege escalation, cross-project contamination, compromised model output, destructive Git operations, unauthorized egress, approval spoofing, and audit tampering.
+## Supported versions
 
-The current implementation is a fixture-only local evaluation. The exercised runner boundary uses
-owner-local TLS 1.3 mutual authentication, rejects replayed/revoked/mismatched/plaintext messages,
-denies network and arbitrary shell, and does not accept provider credentials. The control-plane and
-runner remain separate processes, and durable policy, audit, idempotency, artifact-integrity, and
-recovery checks are covered by the active test suites.
+Moonshift has no released version line yet. Security fixes target the current `main` branch. Older
+commits, feature branches, fixture artifacts, and downstream deployments are not supported versions.
 
-These controls do not claim OCI isolation, hostile-workload protection, real provider authentication,
-unrestricted repository execution, public-network hardening, production backup scheduling, or general
-retention/deletion. The fixture backup/restore contract and local operating limits are documented in
-[`docs/operations/`](docs/operations/); the contract is not evidence that a production backup service
-exists. Security-sensitive changes must include targeted validation and independent review.
+## Current security boundary
+
+The implemented fixture path includes:
+
+- a separate control-plane and runner process boundary;
+- owner-local TLS 1.3 mutual authentication with identity binding;
+- replay, revocation, stale-lease, plaintext, and identity-mismatch rejection;
+- provider-neutral allowlist projection before backend observations reach persistence or the UI;
+- bounded policy, approval, audit, idempotency, fencing, artifact-integrity, and recovery checks;
+- denied external network, arbitrary shell, deployment, and provider credentials.
+
+These controls do **not** claim OCI isolation, hostile-workload protection, real provider
+authentication, unrestricted repository execution, public-network hardening, production backup
+scheduling, or general retention/deletion. See the
+[security posture](docs/operations/security-posture.md) and
+[security model](docs/architecture/security-model.md) for the exact boundary.
+
+Security-sensitive changes require targeted deterministic validation and independent review. Please
+also follow the repository's [responsible contribution guidance](CONTRIBUTING.md).

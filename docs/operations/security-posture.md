@@ -1,7 +1,7 @@
 # Fixture-only security posture
 
-The current implementation is a controlled local fixture and pre-publication alpha. It is not a
-production security boundary.
+The current implementation is a controlled local fixture and public alpha. It is not a production
+security boundary or supported deployment profile.
 
 Implemented or exercised boundaries include one supervisor model, provider-neutral fake execution,
 explicit policy and approval checks, durable audit/idempotency/recovery state, owner-local artifact

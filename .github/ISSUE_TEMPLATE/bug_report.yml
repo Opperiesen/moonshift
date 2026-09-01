@@ -1,0 +1,75 @@
+name: Bug report
+description: Report reproducible behavior in the current Moonshift alpha
+title: '[Bug]: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Moonshift. Do not include credentials, private repositories, personal data, or vulnerability details. Report security issues through the private channel in SECURITY.md.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect instead?
+      placeholder: A concise description of the observed and expected behavior.
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Moonshift revision
+      description: Commit SHA or branch where the problem occurs.
+      placeholder: d17846e or main
+    validations:
+      required: true
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Control plane
+        - Runner
+        - Web interface
+        - CLI
+        - Contracts or schemas
+        - Persistence or recovery
+        - Tests or development tooling
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide the smallest deterministic sequence that reproduces the issue.
+      placeholder: |
+        1. Install with ...
+        2. Run ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, architecture, Node.js/pnpm versions, PostgreSQL path, and relevant fixture mode.
+      placeholder: macOS arm64, Node.js 24.20.0, pnpm 11.24.0
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Validation and sanitized evidence
+      description: List failing commands, test names, or sanitized output. Do not paste secrets or private model reasoning.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I searched existing issues and confirmed this is not a duplicate.
+          required: true
+        - label: This report contains no credential, token, cookie, private key, personal data, or private repository content.
+          required: true
+        - label: This is not a security vulnerability requiring private disclosure.
+          required: true

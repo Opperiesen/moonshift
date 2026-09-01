@@ -1,9 +1,9 @@
-# ADR 0004: Choose an Open-Source License Before Public Release
+# ADR 0004: License Moonshift Under Apache-2.0
 
-- **Status**: Proposed — human decision required
-- **Date**: 2026-08-30
+- **Status**: Accepted
+- **Date**: 2026-09-02
 - **Decision owner**: Human supervisor
-- **Decision gate**: Before the first public release or acceptance of external contributions
+- **Decision gate**: Satisfied before public repository launch
 
 ## Context
 
@@ -27,7 +27,48 @@ It better protects reciprocal access to improvements in a self-hosted network pr
 adoption by organizations with policies against strong copyleft and complicate some dependency or
 commercial integration choices.
 
-## Decision criteria
+## Decision
+
+Moonshift is licensed under the **Apache License 2.0**. The repository carries the unmodified license
+text in [`LICENSE`](../../LICENSE), and the root package metadata uses the SPDX identifier
+`Apache-2.0`.
+
+The deciding priority is broad genuine open-source adoption across self-hosters, integrators, coding
+harnesses, provider adapters, and commercial environments. Apache-2.0 also provides an express patent
+grant and clear notice obligations without adding field-of-use, hosted-service, branding, or
+multi-tenant restrictions.
+
+## Evidence and trade-offs
+
+The decision compared current licenses of adjacent projects on 2026-09-02. OpenHands, Langflow, and
+GitLab Community Edition use permissive MIT licensing. Apache-2.0 offers similarly low integration
+friction with a stronger explicit patent grant. By contrast, Dify's modified license, n8n's
+Sustainable Use License, and Airbyte's Elastic License 2.0 add commercial or hosted-service
+restrictions and are not treated here as standard OSI open-source precedents.
+
+Primary references:
+
+- [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) and its
+  [OSI entry](https://opensource.org/license/apache-2.0)
+- [GNU Affero General Public License v3.0](https://opensource.org/license/agpl-3.0)
+- [OpenHands license](https://github.com/All-Hands-AI/OpenHands/blob/main/LICENSE)
+- [Langflow license](https://github.com/langflow-ai/langflow/blob/main/LICENSE)
+- [GitLab licensing guidance](https://docs.gitlab.com/development/licensing/)
+
+Apache-2.0 deliberately permits proprietary modifications and hosted offerings without requiring
+their source to be published. AGPL-3.0 would better enforce reciprocity for modified network services,
+but would also narrow proprietary integration and organizational adoption. The supervisor selected
+adoption and interoperability as the stronger priority for Moonshift's provider-agnostic ecosystem.
+
+The dependency inventory was reviewed with `pnpm licenses list`. Current runtime dependencies use
+permissive licenses. Development tooling includes `@sourcemeta/jsonschema` under AGPL-3.0; it is not
+linked into or distributed as Moonshift runtime code. Release packaging must continue to produce an
+SBOM and review the exact distributed dependency graph.
+
+This record documents a product decision, not legal advice. Qualified legal review remains advisable
+before commercial distribution or a production release.
+
+## Earlier decision criteria
 
 The human supervisor must decide the priority among:
 
@@ -38,16 +79,16 @@ The human supervisor must decide the priority among:
 - desired patent protections and notice process;
 - whether a future dual-license model is intended and operationally supportable.
 
-Before deciding, obtain qualified legal review, inventory planned dependencies and generated assets,
-and document copyright ownership and contribution policy. Do not accept code under ambiguous terms.
+## Consequences
 
-## Interim rule
-
-Until this ADR is accepted with one option, the repository is **not licensed for public reuse**. Do
-not add a `LICENSE` file, publish a release, or imply OSI-granted permissions. Documentation may state
-the open-source intent and that the license decision is pending.
-
-## Consequences of deferral
-
-Private planning and implementation may continue. Public release, broad external contribution intake,
-and claims about license compatibility are blocked at the decision gate.
+- Source, documentation, and accepted contributions are available under Apache-2.0 unless a file
+  clearly states otherwise.
+- Vendored or derived material retains its upstream license and attribution, as recorded in
+  [`THIRD_PARTY_NOTICES.md`](../../THIRD_PARTY_NOTICES.md) and colocated license files.
+- Contributions submitted for inclusion are handled by Apache-2.0 section 5; no contributor license
+  agreement is introduced by this decision.
+- No Commons Clause, hosted-service restriction, branding condition, or other non-standard term is
+  added to the license.
+- A future relicense or dual-license model requires a new decision and a contributor-rights analysis;
+  this decision does not assume those rights can be obtained later.
+- Trademark rights are not granted beyond Apache-2.0 section 6.

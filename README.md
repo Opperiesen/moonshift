@@ -1,45 +1,136 @@
-# Moonshift
+<p align="center">
+  <img src="docs/assets/moonshift-hero.svg" alt="Moonshift — supervised autonomy for software development" width="100%" />
+</p>
 
-Moonshift is intended to become an open-source, self-hosted workspace for autonomous software development under the supervision of one human. It is provider-agnostic and designed to work with both model APIs and agentic coding harnesses through replaceable execution backends.
+<p align="center">
+  <a href="https://github.com/Opperiesen/moonshift/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Opperiesen/moonshift/actions/workflows/ci.yml/badge.svg?branch=main" /></a>
+  <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-6d5dfc" /></a>
+  <img alt="Status: alpha" src="https://img.shields.io/badge/status-alpha-f59e0b" />
+  <img alt="Node.js 24" src="https://img.shields.io/badge/Node.js-24-3c873a" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-7-3178c6" />
+</p>
 
-Moonshift is currently **pre-implementation alpha**. The repository is being prepared with product documentation, architecture decisions, and a first Spec Kit feature; the production application is not available yet. Nothing in this README should be read as a claim that provider integrations, deployment bundles, or runtime capabilities are already supported.
+<p align="center">
+  <strong>Give one objective. Keep human authority. Delegate the software project.</strong>
+</p>
 
-## Product direction
+Moonshift is an open-source, self-hosted workspace for autonomous software development under the
+supervision of exactly one human. It is designed to turn a software objective into bounded,
+observable work across persistent product, engineering, and quality roles—without making a model,
+provider, harness, or chat session the system of record.
 
-One supervisor gives Moonshift a software objective and observes a durable project organization of persistent personas and temporary specialists. The intended system will structure work, delegate bounded tasks, run work in an isolated execution plane, and require objective evidence before completion. The supervisor remains the root authority.
+> [!IMPORTANT]
+> Moonshift is an implementation-local **alpha**, not a supported production product. The current
+> end-to-end slice uses deterministic fixtures: there are no real provider integrations, production
+> deployment bundles, unrestricted repository shell, or general-purpose runner isolation yet.
 
-The planned product boundary is a browser control plane, an isolated runner, and an administration CLI. The initial target is self-hosting on a small Proxmox VE installation with remote inference; Moonshift is not local-model-only and does not require one model provider or one coding harness.
+## Why Moonshift
 
-The v0.1 scope is deliberately limited to one human supervisor per self-hosted instance. Team accounts, multi-human RBAC, a managed cloud edition, Kubernetes distribution, marketplace, mobile or desktop-native applications, recursive specialists, and autonomous self-modification are out of scope for that version.
+Most coding agents optimize a session. Moonshift is building the control system around the whole
+project:
 
-## Status and roadmap
+- **Human sovereignty** — one supervisor can inspect, approve, reject, pause, resume, or stop work.
+- **Evidence over confidence** — completion requires revision-bound tests, artifacts, and independent
+  verification.
+- **Provider-neutral identities** — roles and durable state survive model, provider, or harness
+  changes.
+- **Bounded autonomy** — delegation, tools, budgets, time, depth, network, and sensitive effects are
+  policy-controlled.
+- **Durable recovery** — PostgreSQL state, checkpoints, idempotent effects, fencing, and reconciliation
+  replace fragile chat history.
+- **Self-hosted by design** — authoritative project, audit, policy, memory, and evidence remain under
+  the owner's control.
 
-The first independently testable slice is `001-supervised-autonomous-loop`: a deterministic fake backend, durable project state, bounded delegation, approval, auditable actions, evidence-based verification, restart/recovery behavior, and a browser projection. It is a planned slice, not a shipped feature.
+## How it fits together
 
-Project foundations and the staged roadmap live in [`docs/feature-map.md`](docs/feature-map.md) when those artifacts are present. The governing principles are in [`.specify/memory/constitution.md`](.specify/memory/constitution.md).
+```mermaid
+flowchart LR
+    H[Human supervisor] -->|objective, policy, approvals| C[Control plane]
+    C <--> D[(PostgreSQL + event log)]
+    C -->|provider-neutral request| B[Execution backend]
+    B -->|bounded tool intent| R[Isolated runner]
+    R -->|workspace changes + artifacts| G[Git and build systems]
+    G --> E[Revision-bound evidence]
+    E --> Q[Independent Quality verification]
+    Q -->|verified result| C
+    C -->|durable projection| H
+```
 
-## Development
+The control plane owns authority and orchestration. Backends supply replaceable cognitive execution.
+The runner executes leased work without becoming authoritative. Git, tests, artifacts, and external
+systems remain physical ground truth.
 
-Moonshift uses GitHub Spec Kit as its first development method. Read [`CONTRIBUTING.md`](CONTRIBUTING.md) for the contribution workflow and [`AGENTS.md`](AGENTS.md) for repository rules. Normative specifications, plans, tasks, and decision records remain versioned in Git.
+## What exists today
 
-There is no supported installation or production deployment yet. The repository does provide an
-implementation-local evaluation path: use Node.js 24.x and the pinned pnpm 11.24.0 toolchain,
-install from the lockfile, and run the package scripts documented in
-[`docs/operations/local-evaluation.md`](docs/operations/local-evaluation.md). This path exercises
-controlled fixtures and disposable/local PostgreSQL only; it does not authenticate with a provider,
-run arbitrary repository shell commands, or expose a production service.
+The completed `001-supervised-autonomous-loop` slice provides a deterministic walking skeleton with:
 
-Operational contracts and boundaries are documented in
-[`docs/operations/`](docs/operations/), including the fixture backup/restore contract. The CLI,
-backup scheduler, production deployment, and general retention policy are not shipped capabilities
-unless an implementation and revision-bound evidence say otherwise.
+- project creation and a browser supervision projection;
+- Product, Engineering, and independent Quality identities;
+- bounded specialist delegation and capacity queues;
+- sensitive-action approval with immutable action digests;
+- append-only audit, artifacts, evidence, and computed verification;
+- two interchangeable fake backend instances;
+- a separate mutual-TLS fixture runner with replay and revocation defenses;
+- restart, checkpoint, effect reconciliation, backup/restore, and capacity evidence.
 
-## Security and licensing
+The completion gate records **91 unit, 71 contract, 114 integration, 33 recovery, 15 security, 1
+capacity, and 23 Chromium acceptance tests**. See the
+[revision-bound evidence](evidence/001-supervised-autonomous-loop/full/final-validation.json).
 
-Security reports are planned to use private GitHub Security Advisories once the project is public. Until publication, please do not disclose vulnerabilities publicly; see [`SECURITY.md`](SECURITY.md).
+## Evaluate the alpha locally
 
-The open-source license is intentionally undecided. The comparison and required human decision are tracked in [`docs/decisions/0004-open-source-license-options.md`](docs/decisions/0004-open-source-license-options.md). No license or permission for public reuse should be inferred before that decision.
+Prerequisites: Node.js `24.x`, Corepack, Git, and a modern browser. PostgreSQL integration tests can
+use the repository's embedded deterministic test path, so no provider or user credential is needed.
 
-## Contributing
+```bash
+corepack enable
+pnpm install --frozen-lockfile
+pnpm validate
+pnpm exec playwright install --with-deps chromium
+pnpm test:acceptance
+```
 
-Private/internal collaboration may continue while the project is being shaped, subject to the current specifications and constitution. Broad external contribution intake begins only after the license and public-governance gates are resolved; see [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
+This validates the fixture implementation; it does not install or start a supported Moonshift
+service. See the [local evaluation guide](docs/operations/local-evaluation.md) for exact boundaries
+and individual commands.
+
+## Repository map
+
+| Path                                       | Purpose                                                                             |
+| ------------------------------------------ | ----------------------------------------------------------------------------------- |
+| [`apps/control-plane`](apps/control-plane) | Durable orchestration, policy, HTTP, scheduling, and projections                    |
+| [`apps/runner`](apps/runner)               | Separate capability-minimal fixture execution boundary                              |
+| [`apps/web`](apps/web)                     | Browser supervision projection                                                      |
+| [`apps/cli`](apps/cli)                     | Thin loopback inspection client                                                     |
+| [`packages`](packages)                     | Provider-neutral domain, policy, contracts, persistence, evidence, and fake backend |
+| [`specs`](specs)                           | Accepted Spec Kit specifications, plans, contracts, tasks, and checklists           |
+| [`evidence`](evidence)                     | Revision-bound completion and independent-review records                            |
+| [`docs/architecture`](docs/architecture)   | System boundaries, security, state, backends, and release model                     |
+
+## Roadmap
+
+| Stage                             | Status          | Outcome                                                                                     |
+| --------------------------------- | --------------- | ------------------------------------------------------------------------------------------- |
+| `001-supervised-autonomous-loop`  | Complete        | Evidence-backed deterministic end-to-end foundation                                         |
+| `002-execution-backend-contracts` | Design complete | General backend-family contracts and conformance framework                                  |
+| `003–012`                         | Planned         | Real adapters, organization engine, hardened runner, autonomous loop, console, and releases |
+
+The [twelve-slice feature map](docs/feature-map.md) is the canonical staged roadmap. Planned behavior
+is documented as intent, not presented as shipped support.
+
+## Project principles
+
+Moonshift uses GitHub Spec Kit as its first development method. Specifications, architecture
+decisions, task state, test evidence, and review findings live in Git so a conversation is never the
+only source of truth. The [constitution](.specify/memory/constitution.md) defines the project's
+non-negotiable authority, safety, verification, and self-hosting principles.
+
+## Contributing and security
+
+Moonshift is early, but scoped contributions and rigorous feedback are welcome. Start with
+[`CONTRIBUTING.md`](CONTRIBUTING.md), and use the issue forms for reproducible bugs or bounded product
+proposals. Security vulnerabilities must be reported privately as described in
+[`SECURITY.md`](SECURITY.md).
+
+Moonshift is licensed under the [Apache License 2.0](LICENSE). Vendored or derived material retains
+the notices listed in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

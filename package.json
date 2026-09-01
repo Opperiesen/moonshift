@@ -2,7 +2,16 @@
   "name": "moonshift",
   "version": "0.0.0",
   "private": true,
+  "license": "Apache-2.0",
   "description": "Self-hosted autonomous software development under one human supervisor.",
+  "homepage": "https://github.com/Opperiesen/moonshift#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Opperiesen/moonshift.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Opperiesen/moonshift/issues"
+  },
   "type": "module",
   "packageManager": "pnpm@11.24.0",
   "engines": {

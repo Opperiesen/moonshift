@@ -59,4 +59,6 @@ The initial reference target is a small 16 GB Proxmox VE host using remote infer
 
 Moonshift is delivered as independently demonstrable vertical slices. Spec Kit is the first [DevelopmentMethod](glossary.md#developmentmethod), while the domain preserves a replaceable boundary. Normative specifications and plans remain versioned in Git; the UI projects their status but does not replace them. Self-improvement can propose versioned changes and evaluation, but cannot silently change the constitution or promote itself.
 
-The staged roadmap is maintained once, in [`feature-map.md`](feature-map.md). Human choices still required before public release are maintained once, in [`open-decisions.md`](open-decisions.md), including the license and final technology choices.
+The staged roadmap is maintained once, in [`feature-map.md`](feature-map.md). Material human and
+technical gates are maintained once in [`open-decisions.md`](open-decisions.md); the open-source
+license decision is recorded in [ADR 0004](decisions/0004-open-source-license-options.md).

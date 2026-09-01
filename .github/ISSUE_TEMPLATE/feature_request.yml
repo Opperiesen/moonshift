@@ -1,0 +1,48 @@
+name: Feature proposal
+description: Propose a bounded outcome aligned with Moonshift's staged roadmap
+title: '[Proposal]: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Moonshift follows a staged Spec Kit roadmap. Describe the problem and outcome without assuming a provider, framework, or implementation.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Who is affected, what hurts, and why is this worth solving now?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What observable result would resolve the problem?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and non-goals
+      description: State the smallest useful boundary and what should remain out of scope.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence or prior art
+      description: Link relevant issues, specifications, user evidence, or comparable behavior.
+  - type: textarea
+    id: risks
+    attributes:
+      label: Authority, security, and compatibility risks
+      description: Note effects on human control, credentials, data, providers, runners, recovery, or public contracts.
+  - type: checkboxes
+    id: alignment
+    attributes:
+      label: Alignment
+      options:
+        - label: I reviewed the feature map and searched existing issues.
+          required: true
+        - label: This proposal does not present planned provider or deployment support as already shipped.
+          required: true
