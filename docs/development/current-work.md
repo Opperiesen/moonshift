@@ -3,13 +3,30 @@
 - Active feature: `002-execution-backend-contracts`
 - Allowed task range: planning artifacts only; the next separately started implementation checkpoint
   is `T001–T035`
-- Checkpoint: `Feature 002 lifecycle preparation before US1`
+- Checkpoint: `Feature 002 lifecycle preparation before US1; public-repository readiness complete`
 - Status: `READY_FOR_US1_IMPLEMENTATION`
 - Branch: `codex/002-execution-backend-contracts`
+- Publication branch: `codex/public-repo-showcase`
 - Feature 001 integrated base: `e9e3c05432b2356e5bf41eb4585339fa8d890399`
 - Planning checkpoint: `4741d7f27de8132d338abd7f274a86f07117f7a3`
+- Public-readiness checkpoint: `5b06975895054a252ca4589858caf050bf8a0760`
 - Worktree: clean after the continuity-only checkpoint; no Feature 002 implementation task has started
-- Last updated: `2026-09-01T21:49:35Z`
+- Last updated: `2026-09-01T22:49:54Z`
+
+## Completed public-repository preparation
+
+- Apache-2.0 is the accepted Moonshift license under ADR 0004; colocated MIT notices and
+  `THIRD_PARTY_NOTICES.md` preserve the attribution of derived GitHub Spec Kit extensions.
+- ADR 0005 selects `github.com/Opperiesen/moonshift` as the canonical public repository. The OCI
+  image namespace remains unresolved and unauthorized under OD-012.
+- The root presentation, visual identity, status boundaries, contribution and conduct guidance,
+  security policy, issue forms, pull request template, ownership, and Dependabot configuration are
+  ready for publication.
+- Repository and full-history credential-pattern scans found no credential-like material. The final
+  post-repair independent review found no unresolved public-readiness blocker.
+- Publication is complete only after the checkpoint is synchronized, visibility is public, private
+  vulnerability reporting is enabled, and the available dependency and secret protections are
+  verified on GitHub.
 
 ## Completed lifecycle preparation
 
@@ -65,6 +82,8 @@ incomplete task.
 | Independent final planning review | PASS   | Fresh post-repair reviewer approved readiness for T001–T035 and every criterion in the three reviewer-owned checklists                                                                                                  |
 | `$speckit-analyze`                | PASS   | Final rerun: 36 FRs, 11 success criteria, 92 sequential tasks, complete reviewed coverage, 109 checked checklist items, and zero unresolved marker or contradiction                                                     |
 | `git diff --check`                | PASS   | No whitespace errors                                                                                                                                                                                                    |
+| Public-readiness validation       | PASS   | Pinned full `pnpm validate`, 23 Chromium acceptance tests, local Markdown-link resolution, YAML parsing, Apache/MIT license checks, SVG XML validation, and full-history credential-pattern scan                        |
+| Independent public review         | PASS   | Fresh post-repair review found no unresolved blocker across license, ownership, claims, attribution, contribution, security, or GitHub community configuration                                                          |
 
 ## Open findings and bounded limitations
 
@@ -75,12 +94,15 @@ incomplete task.
   provider account, consumer session, or provider compatibility is implemented or claimed.
 - Provider credential variables must be absent and fixture processes must enforce denied external
   network, arbitrary shell, and deployment capabilities in Foundation/US1 evidence.
-- Open decisions OD-005–OD-010 remain unresolved and cannot be inferred from fixtures or planning.
+- Open decisions OD-005–OD-007 and OD-009–OD-012 remain unresolved and cannot be inferred from
+  fixtures or planning.
 - The host defaults remain outside repository pins; authoritative validation uses the pinned Node.js
   24.20.0/pnpm 11.24.0 wrapper.
-- No deployment, production mutation, remote Git mutation, or push is authorized.
+- No deployment, production mutation, OCI image publication, package publication, or release is
+  authorized. Remote mutations are limited to the supervisor-authorized repository synchronization,
+  public visibility, descriptive metadata, and repository security settings recorded in ADR 0005.
 
 ## Exact next action
 
-In a separate task, start T001–T035 at T001 and do not begin T036 until the US1 checkpoint has been
-accepted.
+Finish and verify the authorized public-repository publication checkpoint. Then, in a separate task,
+start T001–T035 at T001 and do not begin T036 until the US1 checkpoint has been accepted.
