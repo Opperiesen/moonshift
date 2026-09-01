@@ -7,9 +7,9 @@
 - Status: `READY_FOR_US1_IMPLEMENTATION`
 - Branch: `codex/002-execution-backend-contracts`
 - Feature 001 integrated base: `e9e3c05432b2356e5bf41eb4585339fa8d890399`
-- Planning checkpoint: pending local commit
-- Worktree: planning changes present; no Feature 002 implementation task has started
-- Last updated: `2026-09-01T21:48:09Z`
+- Planning checkpoint: `4741d7f27de8132d338abd7f274a86f07117f7a3`
+- Worktree: clean after the continuity-only checkpoint; no Feature 002 implementation task has started
+- Last updated: `2026-09-01T21:49:35Z`
 
 ## Completed lifecycle preparation
 
@@ -81,5 +81,5 @@ contract-first RED evidence, and must stop with `T036` as the first incomplete t
 
 ## Exact next action
 
-Create the local planning checkpoint commit and stop. In a separate task, start T001–T035 at T001 and
-do not begin T036 until the US1 checkpoint has been accepted.
+In a separate task, start T001–T035 at T001 and do not begin T036 until the US1 checkpoint has been
+accepted.
