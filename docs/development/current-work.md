@@ -1,71 +1,75 @@
 # Current Moonshift Work
 
 - Active feature: `001-supervised-autonomous-loop`
-- Allowed task range: `T025–T035`
-- Checkpoint: `US1 — Start and Observe a Bounded Project`
-- Status: `US1_COMPLETE`
-- Branch: `codex/us1-start-observe`
-- Foundation base: `19b3ef7f4a761741e0cd1c5247516c025c1f9ea3`
-- US1 implementation: `3ce748fce83c4ba599ff5b89789bfc93ffd0783c`
+- Allowed task range: `T036–T046`
+- Checkpoint: `US2 — Govern Sensitive and Stoppable Work`
+- Status: `US2_COMPLETE`
+- Branch: `codex/us2-govern-sensitive`
+- US1 base: `2d68df994ea78ae1f57e2f7504bdfe002190e6ac`
+- US2 implementation: `2fcdc71313f1fd333c5b965aaebaad2bbe627e9c`
 - Worktree: clean after the local evidence/continuity checkpoint commit
-- Last updated: `2026-08-31T23:06:32Z`
+- Last updated: `2026-09-01T02:13:56Z`
 
 ## Completed tasks
 
-`T025–T035` — authenticated loopback project API, bounded default organization and delegation,
-PostgreSQL-backed atomic project bootstrap, fixture scheduling and capacity reasons, minimized context,
-ordered durable events and live SSE recovery, accessible Projects/Observe browser views, deterministic
-acceptance coverage, independent review, and durable US1 evidence.
+`T036–T046` — approval-bound simulated sensitive effects; immutable action digests; supervisor-only,
+versioned, idempotent decisions; PostgreSQL-authoritative expiry and global capacity; distinct durable
+pause, resume, stop, and cancel semantics; restart-safe reconciliation; mutually authenticated runner
+transport; durable one-shot leases, fencing, pre-offer cancellation, and queryable effect ledger;
+attributable audit projections; Supervise browser controls; deterministic acceptance coverage;
+independent review; bounded convergence; and durable US2 evidence.
 
 ## First incomplete task
 
-`T036` — supervision policy/domain tests. This begins User Story 2 and is intentionally outside the
-completed US1 scope; do not start it until the next bounded iteration is explicitly authorized.
+`T047` — verification rule-matrix tests. This begins User Story 3 and is intentionally outside the
+completed US2 scope; do not start it until the next bounded iteration is explicitly authorized.
 
 ## Principal files changed
 
-- `apps/control-plane/` — PostgreSQL/in-memory repository ports, project application service,
-  scheduler, HTTP/session routes, projections, typed models, and production/fixture assembly
-- `apps/web/` — Vite/React Projects and Observe views with authenticated submission, live SSE replay,
-  expired-cursor reload, reconnect states, presence, organization, task, and capacity summaries
-- `packages/domain/src/project-organization.ts` — default council, bounded channels, complete
-  delegation, and specialist archival rules
-- `packages/persistence/src/migrations/002_start_observe.sql` and migration manifest — durable project
-  snapshots, ordered events, retention watermark, and upgrade coverage
-- `tests/contract/projects-api.test.ts`, `tests/integration/start-observe.test.ts`, and
-  `tests/acceptance/start-observe.spec.ts` — API, PostgreSQL, scheduling, concurrency, SSE, and browser
-  journey evidence
-- `evidence/001-supervised-autonomous-loop/us1/manifest.json` — authoritative T035 evidence record
-- `specs/001-supervised-autonomous-loop/tasks.md` — T025–T035 completed; T036 remains unchecked
+- `apps/control-plane/src/application/supervision/` and `apps/control-plane/src/http/supervision.ts` —
+  durable approval, effect, budget, authority, and supervisor-control application paths plus HTTP API
+- `apps/control-plane/src/application/projects/` and `apps/control-plane/src/model.ts` — PostgreSQL
+  authority time, globally locked capacity reservations, and durable US2 state projections
+- `apps/runner/src/` — mutually authenticated client/server protocol, durable lease journal, exact
+  enrolled identity, revocation fencing, and queryable at-most-once fixture effect ledger
+- `packages/policy/src/supervision.ts` and `apps/control-plane/src/projections/supervision-events.ts` —
+  policy/control transitions and attributable, privacy-bounded audit projections
+- `apps/web/src/features/supervise/` and `apps/web/src/services/project-api.ts` — immutable approval
+  detail, budget/capacity display, and distinct pause/resume/stop/cancel feedback
+- `tests/` and `packages/policy/src/supervision.test.ts` — policy, contract, PostgreSQL concurrency,
+  crash/reconciliation, runner-security, race, and browser evidence
+- `evidence/001-supervised-autonomous-loop/us2/manifest.json` — authoritative T046 evidence record
+- `specs/001-supervised-autonomous-loop/tasks.md` — T036–T046 completed; T047 remains unchecked
 
 ## Verification evidence
 
-| Command                                            | Result | Notes                                                                                                                   |
-| -------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------- |
-| Startup Spec Kit/checklist audit                   | PASS   | Active feature resolved; 138/138 actual checklist entries passed across nine files                                      |
-| `node scripts/generate-contract-types.mjs --check` | PASS   | Generated contract types reproduce from the approved OpenAPI source                                                     |
-| `pnpm clean && pnpm validate`                      | PASS   | Pinned Node 24.20.0/pnpm 11.24.0; format, lint, boundaries, lockfile, image pins, secrets, typecheck, 61/56/60 tests    |
-| `pnpm test:acceptance`                             | PASS   | 6/6 Chromium tests, including valid/rejected flows, presence, capacity, live delivery, and automatic cursor recovery    |
-| `pnpm --filter @moonshift/web build`               | PASS   | Vite production build completed                                                                                         |
-| Independent final review                           | PASS   | Fresh reviewer found no substantive US1 findings; targeted independent 4 unit, 7 contract, and 7 integration tests pass |
-| `$speckit-converge` bounded to T025–T035           | PASS   | No remaining US1 work appended; all 11 tasks checked and T036 remains untouched                                         |
-| `git diff --check`                                 | PASS   | No whitespace errors                                                                                                    |
+| Command                                            | Result | Notes                                                                                                                         |
+| -------------------------------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Focused runner and supervision integration         | PASS   | 2 files, 55/55 tests; approval races, restart reconciliation, mTLS, one-shot leases, cancellation fencing, and capacity       |
+| `pnpm clean && pnpm validate`                      | PASS   | Pinned Node 24.20.0/pnpm 11.24.0; format, lint, boundaries, lockfile, image pins, secrets, typecheck, 75/60/79 tests          |
+| `pnpm test:acceptance`                             | PASS   | 9/9 Chromium tests, including approve/apply-once, reject/expiry, and visibly distinct pause/resume/stop/cancel journeys       |
+| `pnpm --filter @moonshift/web build`               | PASS   | Vite production build completed                                                                                               |
+| `node scripts/generate-contract-types.mjs --check` | PASS   | Generated contract types reproduce from the approved contracts                                                                |
+| Independent final review                           | PASS   | Fresh reviewer found no substantive T036–T045 findings after the durable runner-capacity projection repair                    |
+| `$speckit-converge` bounded to T036–T046           | PASS   | 6 acceptance scenarios, 12 bounded functional requirements, 4 bounded success outcomes, and 5 plan decisions have no open gap |
+| `git diff --check`                                 | PASS   | No whitespace errors                                                                                                          |
 
 ## Open findings
 
-- The host exposes Node.js `26.7.0` and pnpm `11.19.0`; validation must continue through the pinned
-  Node.js `24.20.0` and pnpm `11.24.0` wrapper.
+- The host exposes Node.js `26.7.0` and pnpm `11.19.0`; validation must continue through the
+  pinned Node.js `24.20.0` and pnpm `11.24.0` wrapper.
 - `docker` and `psql` are not on `PATH`; deterministic integration validation uses the approved
   embedded PostgreSQL 18.4 server.
-- US1 deliberately stops at the fake backend tool-intent/approval boundary. It performs no sensitive
-  effect and makes no verification claim; approval/control behavior begins at T036.
-- Review rounds drove repairs for transactionally durable capacity and idempotency, PostgreSQL
-  retention and replay races, persistent SSE/reset recovery, actual-loopback and bootstrap TTL
-  enforcement, raw request bounds, the default four-specialist ceiling, PostgreSQL-clock temporal
-  authority, delegated runtime propagation, safe retention caps, bounded channel policy, and a
-  PostgreSQL-backed HTTP assembly. The final fresh review reported no substantive findings.
+- US2 performs only the controlled simulated sensitive fixture effect. It uses no real provider
+  credential, unrestricted shell, external network effect, or production mutation, and makes no
+  verification claim; verification behavior begins at T047.
+- Independent review rounds drove repairs for lease expiry enforcement, exact mTLS identity, durable
+  one-shot lease consumption, cross-instance PostgreSQL capacity, stop/completion serialization,
+  restart recovery, indeterminate-effect blocking, durable pre-offer cancellation fencing, journal
+  validation, and live runner-capacity projection. The final fresh review reported no substantive
+  findings.
 
 ## Exact next action
 
-US1 is complete; stop here. T036 is the first task of User Story 2 and must remain untouched until the
+US2 is complete; stop here. T047 is the first task of User Story 3 and must remain untouched until the
 next explicitly authorized bounded iteration.

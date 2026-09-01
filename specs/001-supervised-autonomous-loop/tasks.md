@@ -126,7 +126,7 @@ safe boundary.
 - [x] T043 [US2] Implement runner-side approved fixture effect execution and queryable effect ledger in `apps/runner/src/fixture/effects.ts`
 - [x] T044 [P] [US2] Implement Supervise approval detail, immutable action preview, capacity/budget display, and control feedback in `apps/web/src/features/supervise/`
 - [x] T045 [US2] Emit and project exactly-once attributable policy, approval, control, tool-intent, attempt, and effect-result audit events in `apps/control-plane/src/projections/supervision-events.ts`
-- [ ] T046 [US2] Run the independent US2 tests and record approval, effect-ledger, stop-race, and audit evidence in `evidence/001-supervised-autonomous-loop/us2/manifest.json`
+- [x] T046 [US2] Run the independent US2 tests and record approval, effect-ledger, stop-race, and audit evidence in `evidence/001-supervised-autonomous-loop/us2/manifest.json`
 
 **Checkpoint**: US2 is independently accepted; no sensitive fixture effect can precede a valid
 supervisor decision or survive revoked authority.

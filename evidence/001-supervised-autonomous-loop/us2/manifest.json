@@ -1,0 +1,111 @@
+{
+  "schemaVersion": "1.0",
+  "feature": "001-supervised-autonomous-loop",
+  "checkpoint": "US2_GOVERN_SENSITIVE_AND_STOPPABLE_WORK",
+  "generatedAt": "2026-09-01T02:13:56Z",
+  "scope": {
+    "tasks": [
+      "T036",
+      "T037",
+      "T038",
+      "T039",
+      "T040",
+      "T041",
+      "T042",
+      "T043",
+      "T044",
+      "T045",
+      "T046"
+    ],
+    "excludedFromThisCheckpoint": "T047+"
+  },
+  "revisions": {
+    "us1Base": "2d68df994ea78ae1f57e2f7504bdfe002190e6ac",
+    "implementation": "2fcdc71313f1fd333c5b965aaebaad2bbe627e9c"
+  },
+  "environment": {
+    "node": "24.20.0",
+    "pnpm": "11.24.0",
+    "postgresql": "18.4 embedded loopback fixture",
+    "browser": "Playwright 1.62.1 Chromium"
+  },
+  "validation": [
+    {
+      "command": "pnpm exec vitest run --project integration tests/integration/supervision.test.ts tests/integration/runner-authentication.test.ts",
+      "result": "PASS",
+      "evidence": "2 files and 55 tests passed, including approval races, restart reconciliation, authenticated runner fencing, pre-offer cancellation, and durable capacity projection."
+    },
+    {
+      "command": "pnpm clean && pnpm validate",
+      "result": "PASS",
+      "evidence": "Format, lint and boundaries, lockfile integrity, immutable image pins, secret scan, typecheck, 75 unit tests, 60 contract tests, and 79 integration tests passed."
+    },
+    {
+      "command": "pnpm test:acceptance",
+      "result": "PASS",
+      "evidence": "9 of 9 Chromium tests passed, including approve/apply-once, reject/expiry, and distinct pause, resume, stop, and cancel journeys."
+    },
+    {
+      "command": "pnpm --filter @moonshift/web build",
+      "result": "PASS",
+      "evidence": "Vite production build completed successfully."
+    },
+    {
+      "command": "node scripts/generate-contract-types.mjs --check",
+      "result": "PASS",
+      "evidence": "Generated TypeScript derivatives reproduce from the approved OpenAPI and runner protocol contracts."
+    },
+    {
+      "command": "git diff --check",
+      "result": "PASS",
+      "evidence": "No whitespace errors."
+    },
+    {
+      "command": "$speckit-converge bounded to T036-T046",
+      "result": "PASS",
+      "evidence": "The bounded US2 specification, plan, tasks, implementation, tests, and evidence contain no remaining actionable gap; T047+ was not evaluated as current work."
+    }
+  ],
+  "approvalEvidence": {
+    "beforeDecision": "The sensitive fixture action persists policy intent and an immutable action-digest approval while the external effect remains REQUESTED and unapplied.",
+    "authority": "Only the configured supervisor actor can decide; specialist self-approval, stale versions, digest tampering, expiry, rejection, cancellation, and budget exhaustion cannot authorize execution.",
+    "concurrency": "Concurrent and duplicate decisions serialize transactionally and converge on one canonical approval outcome and at most one effect attempt."
+  },
+  "effectLedgerEvidence": {
+    "transport": "The loopback runner requires mutually authenticated TLS and an exact enrolled URI identity before domain handling.",
+    "binding": "Every offer, query, and cancellation is bound to stable effect, digest, execution, lease, and fencing-token authority.",
+    "oneShot": "Accepted leases are durably consumed before effect application; replay and stale authority are rejected without a duplicate ledger entry.",
+    "groundTruth": "The queryable durable fixture ledger reconciles APPLIED, NOT_APPLIED, and indeterminate outcomes after control-plane or runner interruption."
+  },
+  "stopRaceEvidence": {
+    "preOfferFence": "A durable cancellation tombstone records the highest revoked authority even when STOP arrives before the delayed offer, so the same or older offer is rejected after restart.",
+    "inFlight": "Pause, stop, and cancel revoke lease authority before reconciliation; indeterminate ground truth remains BLOCKED and retains runner capacity until resolved.",
+    "terminalSemantics": "STOP is recoverable through a successor execution with fresh authority, CANCEL is terminal, and optimistic project versions make the first committed completion/control transition win."
+  },
+  "auditEvidence": {
+    "attribution": "Policy, tool intent, approval request/decision, effect attempt/result, and control receipt/completion records carry one attributable actor, correlation identity, target, reason, and outcome.",
+    "exactlyOnce": "Transactional command idempotency and projection tests prevent duplicate logical audit identities under retries and races.",
+    "privacy": "Public fixture projections contain bounded summaries and omit private reasoning, credentials, authorization material, raw prompts, and host-sensitive paths."
+  },
+  "capacityAndTimeEvidence": {
+    "authorityClock": "Approval and lease validity use PostgreSQL clock_timestamp() inside the authoritative mutation transaction.",
+    "globalReservation": "Cross-instance runner reservation serializes on a PostgreSQL advisory transaction lock; a delayed first effect projects 1/1, a second waits without crossing its boundary, and determinate release projects 0/1.",
+    "failClosed": "UNKNOWN and RECONCILING effects continue to occupy the single runner slot until durable ground truth is known."
+  },
+  "independentReview": {
+    "actionableRepairReview": "us2_final_review_11",
+    "freshFinalReviewer": "us2_final_review_12",
+    "finalResult": "PASS_NO_SUBSTANTIVE_FINDINGS",
+    "reviewedRisks": "Approval authority, PostgreSQL time and capacity, idempotent ledger recovery, STOP-before-offer fencing, mTLS identity, one-shot lease consumption, runner-capacity projection, contract/UI consistency, secrets, and remote effects."
+  },
+  "safety": {
+    "realProviderUsed": false,
+    "providerCredentialUsed": false,
+    "unrestrictedShellUsed": false,
+    "externalNetworkEffectPerformed": false,
+    "simulatedSensitiveFixtureEffectPerformed": true,
+    "realSensitiveEffectPerformed": false,
+    "productionMutationPerformed": false,
+    "verificationClaimed": false
+  }
+}
