@@ -1,0 +1,258 @@
+{
+  "schemaVersion": "1.0",
+  "feature": "001-supervised-autonomous-loop",
+  "kind": "QUICKSTART_VALIDATION",
+  "generatedAt": "2026-09-01T20:25:05Z",
+  "gitRevision": "de2f29d640351b219c2be09121784006d9d9bc7e",
+  "source": {
+    "path": "specs/001-supervised-autonomous-loop/quickstart.md",
+    "sha256": "sha256:a8177af7f5ee6f427fd74aaf5f19a3a2dc1679a4035e093ffdd7b69d99dbb0f5"
+  },
+  "toolchain": {
+    "selectionCommand": "npx --yes --package=node@24.20.0 --package=pnpm@11.24.0 --call '<quickstart command>'",
+    "node": "24.20.0",
+    "pnpm": "11.24.0",
+    "corepackAction": "The pinned npx wrapper selected the exact toolchain because the host defaults were outside the repository pins."
+  },
+  "setup": [
+    {
+      "command": "pnpm install --frozen-lockfile --offline",
+      "result": "PASS",
+      "context": "Fresh isolated local clone; 196 packages reused from the content-addressable store and zero downloaded."
+    },
+    {
+      "command": "pnpm typecheck",
+      "result": "PASS"
+    },
+    {
+      "command": "pnpm contracts:validate",
+      "result": "PASS",
+      "testsPassed": 71
+    },
+    {
+      "command": "pnpm test:runner",
+      "result": "PASS",
+      "testsPassed": 40
+    },
+    {
+      "command": "pnpm test:acceptance",
+      "result": "PASS",
+      "testsPassed": 23
+    }
+  ],
+  "referenceJourney": [
+    {
+      "step": 1,
+      "result": "PASS",
+      "evidence": [
+        "tests/acceptance/start-observe.spec.ts",
+        "tests/integration/start-observe.test.ts"
+      ]
+    },
+    {
+      "step": 2,
+      "result": "PASS",
+      "evidence": [
+        "tests/integration/start-observe.test.ts",
+        "tests/integration/persistence.test.ts"
+      ]
+    },
+    {
+      "step": 3,
+      "result": "PASS",
+      "evidence": [
+        "tests/acceptance/start-observe.spec.ts",
+        "packages/domain/src/project-organization.test.ts"
+      ]
+    },
+    {
+      "step": 4,
+      "result": "PASS",
+      "evidence": [
+        "packages/domain/src/project-organization.test.ts",
+        "packages/policy/src/policy.test.ts"
+      ]
+    },
+    {
+      "step": 5,
+      "result": "PASS",
+      "evidence": [
+        "tests/security/security-boundaries.test.ts",
+        "tests/contract/execution-backend-conformance.test.ts"
+      ]
+    },
+    {
+      "step": 6,
+      "result": "PASS",
+      "evidence": ["tests/acceptance/supervise.spec.ts", "tests/integration/supervision.test.ts"]
+    },
+    {
+      "step": 7,
+      "result": "PASS",
+      "evidence": [
+        "tests/acceptance/supervise.spec.ts",
+        "tests/recovery/effect-crash-matrix.test.ts"
+      ]
+    },
+    {
+      "step": 8,
+      "result": "PASS",
+      "evidence": [
+        "tests/acceptance/verification.spec.ts",
+        "tests/integration/verification.test.ts"
+      ]
+    },
+    {
+      "step": 9,
+      "result": "PASS",
+      "evidence": [
+        "tests/acceptance/verification.spec.ts",
+        "tests/integration/verification.test.ts"
+      ]
+    },
+    {
+      "step": 10,
+      "result": "PASS",
+      "evidence": [
+        "tests/acceptance/verification.spec.ts",
+        "packages/verification/src/verification-engine.test.ts"
+      ]
+    },
+    {
+      "step": 11,
+      "result": "PASS",
+      "evidence": [
+        "tests/integration/verification.test.ts",
+        "packages/verification/src/verification-engine.test.ts"
+      ]
+    },
+    {
+      "step": 12,
+      "result": "PASS",
+      "evidence": [
+        "tests/acceptance/recovery.spec.ts",
+        "tests/recovery/control-plane-restart.test.ts"
+      ]
+    },
+    {
+      "step": 13,
+      "result": "PASS",
+      "evidence": [
+        "tests/acceptance/start-observe.spec.ts",
+        "tests/acceptance/results-audit.spec.ts"
+      ]
+    },
+    {
+      "step": 14,
+      "result": "PASS",
+      "evidence": [
+        "tests/recovery/effect-crash-matrix.test.ts",
+        "tests/recovery/runtime-recovery.test.ts"
+      ]
+    },
+    {
+      "step": 15,
+      "result": "PASS",
+      "evidence": ["tests/recovery/backend-switch.test.ts", "tests/acceptance/recovery.spec.ts"]
+    },
+    {
+      "step": 16,
+      "result": "PASS",
+      "evidence": [
+        "tests/acceptance/results-audit.spec.ts",
+        "tests/integration/result-projection.test.ts"
+      ]
+    }
+  ],
+  "automatedAcceptance": [
+    {
+      "command": "pnpm test:unit",
+      "result": "PASS",
+      "testsPassed": 91
+    },
+    {
+      "command": "pnpm test:contract",
+      "result": "PASS",
+      "testsPassed": 71
+    },
+    {
+      "command": "pnpm test:integration",
+      "result": "PASS",
+      "testsPassed": 114
+    },
+    {
+      "command": "pnpm test:runner",
+      "result": "PASS",
+      "testsPassed": 40
+    },
+    {
+      "command": "pnpm test:acceptance",
+      "result": "PASS",
+      "testsPassed": 23
+    },
+    {
+      "command": "pnpm test:recovery",
+      "result": "PASS",
+      "testsPassed": 33
+    },
+    {
+      "command": "pnpm test:crash-matrix",
+      "result": "PASS",
+      "testsPassed": 9
+    },
+    {
+      "command": "pnpm test:security",
+      "result": "PASS",
+      "testsPassed": 15
+    },
+    {
+      "command": "pnpm test:migration",
+      "result": "PASS",
+      "testsPassed": 1
+    },
+    {
+      "command": "pnpm test:restore",
+      "result": "PASS",
+      "testsPassed": 5
+    },
+    {
+      "command": "pnpm test:capacity",
+      "result": "PASS",
+      "testsPassed": 1
+    }
+  ],
+  "failureExercises": {
+    "command": "pnpm test:crash-matrix",
+    "result": "PASS",
+    "boundaries": [
+      "BEFORE_EFFECT_INTENT_COMMIT",
+      "AFTER_INTENT_COMMIT_BEFORE_RUNNER_DISPATCH",
+      "AFTER_DISPATCH_BEFORE_FIXTURE_MUTATION",
+      "AFTER_FIXTURE_MUTATION_BEFORE_RUNNER_RESULT",
+      "AFTER_RUNNER_RESULT_BEFORE_APPLIED_COMMIT",
+      "AFTER_EFFECT_COMMIT_BEFORE_OUTBOX_PUBLICATION",
+      "AFTER_OUTBOX_PUBLICATION_BEFORE_BROWSER_ACKNOWLEDGEMENT"
+    ],
+    "outcome": "Every boundary retained committed authority and converged without a second semantic fixture effect; unknown ground truth remained blocked."
+  },
+  "backupRestoreExercise": {
+    "migrationCommand": "pnpm test:migration",
+    "restoreCommand": "pnpm test:restore",
+    "result": "PASS",
+    "outcome": "Current and previous schema migration, manifest/hash tamper rejection, empty-target enforcement, artifact restoration, mandatory projection reconstruction proof, absent/no-op/failing reconstruction rejection, independent checkpoint/outbox validation, and deterministic exclusion of a concurrent control-plane submission until validated restore releases its PostgreSQL maintenance lock passed."
+  },
+  "cleanCheckout": {
+    "sourceRevision": "de2f29d640351b219c2be09121784006d9d9bc7e",
+    "cloneCommand": "git clone --local --no-hardlinks --branch codex/phase8-hardening <repository> <fresh-directory>",
+    "toolchainCommand": "npx --yes --package=node@24.20.0 --package=pnpm@11.24.0 --call 'pnpm install --frozen-lockfile --offline && pnpm typecheck && pnpm contracts:validate && pnpm test:runner && pnpm test:acceptance'",
+    "trackedChangesAfterValidation": 0,
+    "result": "PASS"
+  },
+  "teardown": {
+    "command": "pnpm clean",
+    "result": "PASS",
+    "scope": "Repository-generated build and test output plus suite-owned temporary state only."
+  },
+  "result": "PASS",
+  "unresolvedFindings": []
+}

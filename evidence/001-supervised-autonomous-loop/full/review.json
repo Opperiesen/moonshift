@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "1.0",
+  "feature": "001-supervised-autonomous-loop",
+  "kind": "INDEPENDENT_FINAL_REVIEW",
+  "generatedAt": "2026-09-01T20:25:05Z",
+  "baseRevision": "97012d7024831fe5810b9e2897fa843bdf55d13e",
+  "candidateRevision": "de2f29d640351b219c2be09121784006d9d9bc7e",
+  "scope": {
+    "tasks": "T076-T086",
+    "dimensions": [
+      "regression",
+      "contracts",
+      "security",
+      "scope",
+      "capacity semantics",
+      "restore exclusion and reconstruction proof"
+    ]
+  },
+  "reviewer": {
+    "role": "reviewer",
+    "modelFamily": "Terra",
+    "independent": true,
+    "readOnly": true
+  },
+  "reviewRounds": [
+    {
+      "candidateRevision": "39f7416827886fe34ae3f2aab18c4272681bc577",
+      "result": "CHANGES_REQUIRED",
+      "findings": [
+        {
+          "severity": "HIGH",
+          "area": "capacity",
+          "disposition": "RESOLVED",
+          "summary": "The original 1/3/5 workload used separate projects and changed specialist limits instead of preserving the one-project, default four-specialist topology."
+        },
+        {
+          "severity": "HIGH",
+          "area": "restore",
+          "disposition": "RESOLVED",
+          "summary": "Restore trusted a caller boolean for scheduler state and did not exclude concurrent control-plane writes through the rebuild boundary."
+        }
+      ]
+    },
+    {
+      "candidateRevision": "de2f29d640351b219c2be09121784006d9d9bc7e",
+      "result": "PASS",
+      "blockingFindings": 0,
+      "findings": []
+    }
+  ],
+  "verifiedRepairs": [
+    "One browser-submitted PostgreSQL project, one specialist, and the default four-specialist limit drive each 1/3/5 cognitive scenario.",
+    "Every admitted fake-backend execution persists its exact sanitized observations through repository, outbox, SSE, and Chromium DOM order assertions.",
+    "Each cognitive limit has an over-capacity COGNITIVE_CAPACITY probe with zero backend observations.",
+    "Runner capacity counts only authoritative in-flight effect states in both PostgreSQL and in-memory repositories.",
+    "Restore holds an exclusive PostgreSQL maintenance lock from target inspection through independent projection proof, while normal writes, recovery, and outbox work take the shared lock.",
+    "A deterministic race proves a control-plane submission waits until validated restore releases maintenance."
+  ],
+  "residualRisks": [
+    "The restore callback receives a trusted maintenance client and must use the maintenance-aware recovery entry point to avoid waiting on its own exclusive lock.",
+    "Capacity results are deterministic fake-backend/PVE fixture evidence, not a production provider or physical-host load guarantee."
+  ],
+  "scopeCheck": {
+    "realProviderAdded": false,
+    "credentialFlowAdded": false,
+    "unrestrictedShellAdded": false,
+    "deploymentAdded": false,
+    "remoteMutationAdded": false
+  },
+  "result": "PASS"
+}

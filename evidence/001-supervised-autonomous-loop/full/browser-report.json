@@ -1,0 +1,156 @@
+{
+  "schemaVersion": "1.0",
+  "feature": "001-supervised-autonomous-loop",
+  "kind": "PLAYWRIGHT_REPORT_EXCERPT",
+  "generatedAt": "2026-09-01T20:23:18.077Z",
+  "gitRevision": "de2f29d640351b219c2be09121784006d9d9bc7e",
+  "command": "pnpm test:acceptance",
+  "source": {
+    "ephemeralPath": "test-results/playwright.json",
+    "sha256": "sha256:2d24eed04963d128430837e32ad7d44a6f655dab28e69bf7f5eaa117a2c91d78",
+    "note": "Canonical result excerpt retained because test-results is intentionally ignored and removed by pnpm clean."
+  },
+  "environment": {
+    "playwright": "1.62.1",
+    "project": "chromium",
+    "workers": 5,
+    "network": "Test-owned loopback services only"
+  },
+  "result": {
+    "expected": 23,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0,
+    "durationMs": 4963.206999999999,
+    "status": "PASS"
+  },
+  "suites": [
+    {
+      "file": "foundation-config.spec.ts",
+      "tests": [
+        {
+          "title": "loads the deterministic foundation acceptance fixture without external effects",
+          "status": "PASS"
+        }
+      ]
+    },
+    {
+      "file": "recovery.spec.ts",
+      "tests": [
+        {
+          "title": "reconnects after a control-plane restart to a durable paused checkpoint",
+          "status": "PASS"
+        },
+        {
+          "title": "shows runtime-loss replanning at the authorization boundary on the second fake backend",
+          "status": "PASS"
+        },
+        {
+          "title": "keeps indeterminate effect recovery blocked with an actionable supervisor message",
+          "status": "PASS"
+        },
+        {
+          "title": "shows an actionable fail-closed message for invalid durable recovery state",
+          "status": "PASS"
+        }
+      ]
+    },
+    {
+      "file": "results-audit.spec.ts",
+      "tests": [
+        {
+          "title": "reconnects to a complete linked Results surface with durable provenance and ordered audit history",
+          "status": "PASS"
+        },
+        {
+          "title": "reloads the durable Results projection after an expired activity cursor without duplicates",
+          "status": "PASS"
+        },
+        {
+          "title": "renders truthful suspended, stopping, stopped, failed, cancelled, and blocked summaries",
+          "status": "PASS"
+        },
+        {
+          "title": "renders authoritative verification blockers and recovery progress",
+          "status": "PASS"
+        }
+      ]
+    },
+    {
+      "file": "start-observe.spec.ts",
+      "tests": [
+        {
+          "title": "submits one objective and observes the bounded organization plus replayed activity",
+          "status": "PASS"
+        },
+        {
+          "title": "shows actionable validation without creating a partial project",
+          "status": "PASS"
+        },
+        {
+          "title": "shows whether queued work waits for cognitive or runner capacity",
+          "status": "PASS"
+        },
+        {
+          "title": "renders every defined presence state with a bounded durable source",
+          "status": "PASS"
+        },
+        {
+          "title": "reloads ProjectView when retention overtakes a live stream before resubscription",
+          "status": "PASS"
+        }
+      ]
+    },
+    {
+      "file": "supervise.spec.ts",
+      "tests": [
+        {
+          "title": "shows immutable approval detail and applies an approved effect exactly once",
+          "status": "PASS"
+        },
+        {
+          "title": "rejects or expires approval without applying the effect and exposes the blocked reason",
+          "status": "PASS"
+        },
+        {
+          "title": "keeps pause, stop, resume, and terminal cancel visibly distinct",
+          "status": "PASS"
+        }
+      ]
+    },
+    {
+      "file": "verification.spec.ts",
+      "tests": [
+        {
+          "title": "shows a passing revision as VERIFIED with independent Quality lineage",
+          "status": "PASS"
+        },
+        {
+          "title": "shows failing evidence and explicit remediation without completion inflation",
+          "status": "PASS"
+        },
+        {
+          "title": "keeps a specialist claim visibly unverified until Quality evaluates it",
+          "status": "PASS"
+        },
+        {
+          "title": "rejects review from the authoring lineage and exposes that lineage",
+          "status": "PASS"
+        },
+        {
+          "title": "shows tampered integrity evidence as blocked rather than verified",
+          "status": "PASS"
+        },
+        {
+          "title": "shows a stale compare-and-commit decision as requiring reevaluation",
+          "status": "PASS"
+        }
+      ]
+    }
+  ],
+  "safety": {
+    "realProviderUsed": false,
+    "externalNetworkEffectPerformed": false,
+    "productionMutationPerformed": false
+  }
+}

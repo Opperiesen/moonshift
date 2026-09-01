@@ -1,0 +1,157 @@
+{
+  "schemaVersion": "1.0",
+  "feature": "001-supervised-autonomous-loop",
+  "kind": "FULL_TEST_MANIFEST",
+  "generatedAt": "2026-09-01T20:25:05Z",
+  "gitRevision": "de2f29d640351b219c2be09121784006d9d9bc7e",
+  "environment": {
+    "node": "24.20.0",
+    "pnpm": "11.24.0",
+    "postgresql": "18.4 embedded loopback fixture",
+    "browser": "Playwright 1.62.1 Chromium",
+    "network": "Test-owned loopback services only"
+  },
+  "preflight": {
+    "command": "pnpm typecheck",
+    "result": "PASS",
+    "purpose": "Rebuild package outputs required by clean-checkout package exports before individual suites run."
+  },
+  "requiredSuites": [
+    {
+      "id": "unit",
+      "command": "pnpm test:unit",
+      "result": "PASS",
+      "testFiles": 8,
+      "testsPassed": 91,
+      "testsSkipped": 0
+    },
+    {
+      "id": "contract",
+      "command": "pnpm test:contract",
+      "result": "PASS",
+      "testFiles": 6,
+      "testsPassed": 71,
+      "testsSkipped": 0
+    },
+    {
+      "id": "postgresql-integration",
+      "command": "pnpm test:integration",
+      "result": "PASS",
+      "testFiles": 8,
+      "testsPassed": 114,
+      "testsSkipped": 0,
+      "database": "Disposable PostgreSQL 18.4 over loopback"
+    },
+    {
+      "id": "runner-process",
+      "command": "pnpm test:runner",
+      "result": "PASS",
+      "testFiles": 1,
+      "testsPassed": 40,
+      "testsSkipped": 0
+    },
+    {
+      "id": "browser",
+      "command": "pnpm test:acceptance",
+      "result": "PASS",
+      "testFiles": 6,
+      "testsPassed": 23,
+      "testsSkipped": 0,
+      "reportSha256": "sha256:9afdbf5b473bfc4443abd05b6ca3fd2a2f3492bf7d988dbd6faa7138d117f5c2",
+      "sourceReportSha256": "sha256:2d24eed04963d128430837e32ad7d44a6f655dab28e69bf7f5eaa117a2c91d78",
+      "reportPath": "evidence/001-supervised-autonomous-loop/full/browser-report.json"
+    },
+    {
+      "id": "recovery",
+      "command": "pnpm test:recovery",
+      "result": "PASS",
+      "testFiles": 5,
+      "testsPassed": 33,
+      "testsSkipped": 0
+    },
+    {
+      "id": "crash-matrix",
+      "command": "pnpm test:crash-matrix",
+      "result": "PASS",
+      "testFiles": 1,
+      "testsPassed": 9,
+      "testsSkipped": 0
+    },
+    {
+      "id": "security",
+      "command": "pnpm test:security",
+      "result": "PASS",
+      "testFiles": 1,
+      "testsPassed": 15,
+      "testsSkipped": 0
+    },
+    {
+      "id": "migration",
+      "command": "pnpm test:migration",
+      "result": "PASS",
+      "testFiles": 1,
+      "testsPassed": 1,
+      "testsSkipped": 4,
+      "selection": "The clean/current/previous-schema migration case selected from the five-case restore file."
+    },
+    {
+      "id": "restore",
+      "command": "pnpm test:restore",
+      "result": "PASS",
+      "testFiles": 1,
+      "testsPassed": 5,
+      "testsSkipped": 0
+    },
+    {
+      "id": "capacity",
+      "command": "pnpm test:capacity",
+      "result": "PASS",
+      "testFiles": 1,
+      "testsPassed": 1,
+      "testsSkipped": 0,
+      "reportSha256": "sha256:96595637cd6140cfe83e01829d70382f53ac22538a47bf740048edc1c6dc822c",
+      "sourceReportSha256": "sha256:900c9329e86c21f0e1ec40d49619a5168a308e077bff85b79dcfc42a4bc46f9a",
+      "reportPath": "evidence/001-supervised-autonomous-loop/full/capacity-report.json"
+    }
+  ],
+  "summary": {
+    "requiredSuites": 11,
+    "requiredSuitesPassed": 11,
+    "failed": 0,
+    "result": "PASS"
+  },
+  "executionNotes": [
+    {
+      "revision": "fc6ca399b741c7538118ebd9b1f9d751fe7ebca6",
+      "result": "SETUP_FAILURE_REPAIRED",
+      "observation": "After pnpm clean, a direct contract-suite run failed because package build outputs had not yet been rebuilt.",
+      "remediation": "Moved pnpm typecheck before contracts:validate in the quickstart, committed the repair, and reran every claimed suite."
+    },
+    {
+      "revision": "04dd82d305f5e0ca7630a971b98f2869c5fb3a39",
+      "result": "CONVERGENCE_GAP_REPAIRED",
+      "observation": "The initial capacity report mislabeled scheduler duration as browser visibility and bypassed the HTTP boundary for command durability.",
+      "remediation": "Measured PostgreSQL event commit-to-connected-Chromium visibility and all six supervisor commands over loopback HTTP, committed the repair, and reran every claimed suite against 885800169f705d1614b7464e15b0fe9b6385d160."
+    },
+    {
+      "revision": "885800169f705d1614b7464e15b0fe9b6385d160",
+      "result": "INDEPENDENT_REVIEW_FINDINGS_REPAIRED",
+      "observation": "Independent review found that restore accepted a no-op validation callback, the 1/3/5 measurements decoupled in-memory scheduling from synthetic browser events, and report hashes referred only to ignored test-results files.",
+      "remediation": "Required a structured projection rebuild proof plus independent restored-database invariants, exercised browser-submitted 1/3/5 projects through configurable PostgreSQL control planes, retained canonical browser and exact capacity reports, committed the repairs, and reran the full deterministic suite against 39f7416827886fe34ae3f2aab18c4272681bc577."
+    },
+    {
+      "revision": "39f7416827886fe34ae3f2aab18c4272681bc577",
+      "result": "FINAL_REVIEW_FINDINGS_REPAIRED",
+      "observation": "Fresh independent review found that capacity used multiple projects with specialist-limit overrides and that restore trusted a scheduler-stopped boolean without excluding concurrent control-plane writes.",
+      "remediation": "Reworked 1/3/5 into one browser-submitted PostgreSQL project with one specialist and the default specialist limit, added a no-backend cognitive queue probe, enforced a PostgreSQL maintenance read/write lock through restore reconstruction proof, added a deterministic concurrent-submission race, and reran every claimed suite against de2f29d640351b219c2be09121784006d9d9bc7e."
+    }
+  ],
+  "safety": {
+    "realProviderUsed": false,
+    "providerCredentialUsed": false,
+    "unrestrictedShellUsed": false,
+    "externalNetworkEffectPerformed": false,
+    "productionMutationPerformed": false,
+    "remoteGitMutationPerformed": false
+  }
+}

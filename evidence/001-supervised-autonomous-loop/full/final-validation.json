@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "1.0",
+  "feature": "001-supervised-autonomous-loop",
+  "kind": "FEATURE_COMPLETION_GATE",
+  "generatedAt": "2026-09-01T20:34:36Z",
+  "implementationRevision": "de2f29d640351b219c2be09121784006d9d9bc7e",
+  "taskRange": "T076-T086",
+  "checklists": {
+    "directory": "specs/001-supervised-autonomous-loop/checklists",
+    "files": 9,
+    "checkedItems": 138,
+    "uncheckedItems": 0,
+    "result": "PASS"
+  },
+  "repositoryValidation": {
+    "command": "npx --yes --package=node@24.20.0 --package=pnpm@11.24.0 --call 'pnpm clean && pnpm validate'",
+    "result": "PASS",
+    "stages": {
+      "format": "PASS",
+      "lintAndBoundaries": "PASS",
+      "lockfile": "PASS",
+      "composeImagePins": "PASS",
+      "credentialLikeMaterialScan": "PASS",
+      "typecheck": "PASS",
+      "unit": "8 files / 91 tests",
+      "contract": "6 files / 71 tests",
+      "integration": "8 files / 114 tests",
+      "recovery": "5 files / 33 tests",
+      "security": "1 file / 15 tests",
+      "capacity": "1 file / 1 test"
+    }
+  },
+  "completeSuiteRun": {
+    "toolchain": "Node.js 24.20.0 / pnpm 11.24.0",
+    "result": "PASS",
+    "requiredSuites": 11,
+    "requiredSuitesPassed": 11,
+    "browser": "Chromium 23/23",
+    "restore": "5/5",
+    "source": "evidence/001-supervised-autonomous-loop/full/test-manifest.json"
+  },
+  "cleanCheckout": {
+    "method": "Fresh local clone with no hard links at the exact implementation revision",
+    "revision": "de2f29d640351b219c2be09121784006d9d9bc7e",
+    "command": "npx --yes --package=node@24.20.0 --package=pnpm@11.24.0 --call 'pnpm install --frozen-lockfile --offline && pnpm typecheck && pnpm contracts:validate && pnpm test:runner && pnpm test:acceptance'",
+    "packagesReused": 196,
+    "packagesDownloaded": 0,
+    "contractsPassed": 71,
+    "runnerTestsPassed": 40,
+    "browserTestsPassed": 23,
+    "trackedChangesAfterValidation": 0,
+    "result": "PASS"
+  },
+  "evidenceIntegrity": {
+    "manifestPath": "evidence/001-supervised-autonomous-loop/full/manifest.json",
+    "manifestSha256": "sha256:f37aeb1363c305d12aecc9621972bb75701922c98cd487a6248f955fd22c480a",
+    "referencedCanonicalHashesVerified": true,
+    "jsonDocumentsParsed": 8,
+    "unresolvedFindings": 0,
+    "result": "PASS"
+  },
+  "convergence": {
+    "result": "CONVERGED",
+    "criticalFindings": 0,
+    "highFindings": 0,
+    "tasksAppended": 0
+  },
+  "independentReview": {
+    "source": "evidence/001-supervised-autonomous-loop/full/review.json",
+    "result": "PASS",
+    "blockingFindings": 0
+  },
+  "scopeAndSafety": {
+    "lockfileChanged": false,
+    "packageChanges": "Repository-native validation scripts only; no dependency changes.",
+    "addedNetworkEndpoints": ["127.0.0.1 test-owned loopback services"],
+    "realProviderOrProviderSdkAdded": false,
+    "providerOrUserCredentialFlowAdded": false,
+    "unrestrictedShellAdded": false,
+    "productionDeploymentBehaviorAdded": false,
+    "remoteGitMutationPerformed": false,
+    "secretScan": "PASS — no credential-like material found",
+    "independentScopeReview": "PASS"
+  },
+  "preCompletionCommit": true,
+  "result": "PASS"
+}

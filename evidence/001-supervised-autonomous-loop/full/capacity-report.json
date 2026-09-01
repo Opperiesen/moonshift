@@ -1,0 +1,226 @@
+{
+  "schemaVersion": "1.0",
+  "feature": "001-supervised-autonomous-loop",
+  "kind": "REFERENCE_CAPACITY_REPORT",
+  "generatedAt": "2026-09-01T20:23:30.919Z",
+  "gitRevision": "de2f29d640351b219c2be09121784006d9d9bc7e",
+  "command": "pnpm test:capacity",
+  "source": {
+    "ephemeralPath": "test-results/reference-capacity.json",
+    "sha256": "sha256:900c9329e86c21f0e1ec40d49619a5168a308e077bff85b79dcfc42a4bc46f9a",
+    "note": "Exact report payload retained below because test-results is intentionally ignored and removed by pnpm clean."
+  },
+  "report": {
+    "schemaVersion": "1.0",
+    "profile": "foundation-16gb-pve-evaluation",
+    "measurement": {
+      "eventVisibility": "Conservative upper bound from PostgreSQL-authored event time before commit through loopback SSE replay to one submitting Chromium DOM",
+      "cognitiveLoad": "One browser-submitted PostgreSQL project and its one bounded specialist; additional slots execute through FixtureScheduler and persist its exact sanitized fake-backend observations through the project repository/outbox",
+      "commandDurability": "Loopback HTTP request to response after PostgreSQL transaction and outbox drain"
+    },
+    "concurrency": {
+      "one": {
+        "cognitiveExecutions": 1,
+        "activeProjects": 1,
+        "activeSpecialists": 1,
+        "configuredSpecialistLimit": 4,
+        "configuredCognitiveRunLimit": 3,
+        "journeyMs": 175.4797500000002,
+        "committedObservableEvents": 20,
+        "executionProducedEvents": 4,
+        "eventVisibilityP50Ms": 141,
+        "eventVisibilityP95Ms": 141,
+        "postgres": {
+          "connections": 2,
+          "waitingLocks": 0,
+          "databaseBytes": 8984255,
+          "pendingOutboxEvents": 0,
+          "outboxLagMs": 0,
+          "queuedExecutions": 0,
+          "queueWaitMs": 0,
+          "queueReasons": {
+            "WAITING_FOR_APPROVAL": 1
+          }
+        }
+      },
+      "three": {
+        "cognitiveExecutions": 3,
+        "activeProjects": 1,
+        "activeSpecialists": 1,
+        "configuredSpecialistLimit": 4,
+        "configuredCognitiveRunLimit": 3,
+        "journeyMs": 197.60966600000006,
+        "committedObservableEvents": 32,
+        "executionProducedEvents": 12,
+        "eventVisibilityP50Ms": 74,
+        "eventVisibilityP95Ms": 102,
+        "postgres": {
+          "connections": 2,
+          "waitingLocks": 0,
+          "databaseBytes": 9025215,
+          "pendingOutboxEvents": 0,
+          "outboxLagMs": 0,
+          "queuedExecutions": 0,
+          "queueWaitMs": 0,
+          "queueReasons": {
+            "WAITING_FOR_APPROVAL": 1
+          }
+        }
+      },
+      "five": {
+        "cognitiveExecutions": 5,
+        "activeProjects": 1,
+        "activeSpecialists": 1,
+        "configuredSpecialistLimit": 4,
+        "configuredCognitiveRunLimit": 5,
+        "journeyMs": 212.607125,
+        "committedObservableEvents": 44,
+        "executionProducedEvents": 20,
+        "eventVisibilityP50Ms": 120,
+        "eventVisibilityP95Ms": 120,
+        "postgres": {
+          "connections": 2,
+          "waitingLocks": 0,
+          "databaseBytes": 9049791,
+          "pendingOutboxEvents": 0,
+          "outboxLagMs": 0,
+          "queuedExecutions": 0,
+          "queueWaitMs": 0,
+          "queueReasons": {
+            "WAITING_FOR_APPROVAL": 1
+          }
+        }
+      }
+    },
+    "projectSubmission": {
+      "count": 3,
+      "p50Ms": 18.96225000000004,
+      "p95Ms": 24.978917000000365
+    },
+    "commandDurability": {
+      "commands": [
+        {
+          "command": "PAUSE",
+          "milliseconds": 9.629791999999725
+        },
+        {
+          "command": "RESUME",
+          "milliseconds": 9.53204199999982
+        },
+        {
+          "command": "APPROVE",
+          "milliseconds": 69.5260000000003
+        },
+        {
+          "command": "STOP",
+          "milliseconds": 9.140707999999904
+        },
+        {
+          "command": "REJECT",
+          "milliseconds": 4.467833000000155
+        },
+        {
+          "command": "CANCEL",
+          "milliseconds": 5.847582999999759
+        }
+      ],
+      "p50Ms": 9.140707999999904,
+      "p95Ms": 69.5260000000003
+    },
+    "commandDurabilityP50Ms": 9.140707999999904,
+    "commandDurabilityP95Ms": 69.5260000000003,
+    "queue": {
+      "reasonsByConcurrency": {
+        "1": "COGNITIVE_CAPACITY",
+        "3": "COGNITIVE_CAPACITY",
+        "5": "COGNITIVE_CAPACITY"
+      },
+      "persistedProjectReasons": {
+        "WAITING_FOR_APPROVAL": 2
+      },
+      "queuedExecutions": 0,
+      "waitMs": 0
+    },
+    "postgres": {
+      "connections": 1,
+      "waitingLocks": 0,
+      "databaseBytes": 9483967,
+      "pendingOutboxEvents": 0,
+      "outboxLagMs": 0,
+      "queuedExecutions": 0,
+      "queueWaitMs": 0,
+      "queueReasons": {
+        "WAITING_FOR_APPROVAL": 2
+      }
+    },
+    "process": {
+      "observedAt": "2026-09-01T20:23:30.919Z",
+      "elapsedMs": 2147.798916,
+      "cpuUserMicros": 1097779,
+      "cpuSystemMicros": 182895,
+      "rssBytes": 445218816,
+      "maxRssBytes": 451231744,
+      "heapUsedBytes": 160871752,
+      "externalBytes": 37342559,
+      "availableCpuUnits": 10
+    },
+    "runner": {
+      "activeLeases": 1,
+      "maximumJobs": 1,
+      "capacity": {
+        "fixtureOperations": true,
+        "arbitraryShell": false,
+        "maxJobs": 1,
+        "memoryBytes": 268435456,
+        "cpuUnits": 1,
+        "processLimit": 1,
+        "diskBytes": 16777216,
+        "maxRuntimeMs": 60000,
+        "networkMode": "DENY",
+        "gpuUnits": 0,
+        "enforcement": {
+          "cpu": false,
+          "memory": false,
+          "process": true,
+          "disk": true,
+          "time": true,
+          "network": true,
+          "gpu": true
+        }
+      },
+      "discovery": {
+        "cgroupVersion": "V2",
+        "cgroupPath": "/user.slice/moonshift.scope",
+        "cgroupControllers": ["cpu", "memory", "pids"],
+        "delegatedControllers": ["cpu", "memory", "pids"],
+        "enforceable": {
+          "cpu": true,
+          "memory": true,
+          "process": true
+        },
+        "subordinateUidRange": true,
+        "subordinateGidRange": true,
+        "rootlessRuntime": "PODMAN",
+        "rootlessNetwork": "PASTA",
+        "storageDriver": "OVERLAY",
+        "filesystemType": "UNVERIFIED",
+        "supportsRootlessOci": false
+      }
+    },
+    "restartInspectionMs": 14.802499999999782,
+    "backup": {
+      "backupBytes": 433766,
+      "databaseBytes": 431271,
+      "artifactBytes": 840,
+      "temporaryDiskBytesHighWater": 0,
+      "inMemoryBytesHighWater": 432926
+    },
+    "restore": {
+      "restoredBytes": 432111,
+      "temporaryDiskBytesHighWater": 840,
+      "inMemoryBytesHighWater": 432926,
+      "schedulingDowntimeMs": 83.85750000000007
+    },
+    "unresolvedFindings": []
+  }
+}

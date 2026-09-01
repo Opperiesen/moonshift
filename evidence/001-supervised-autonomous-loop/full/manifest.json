@@ -1,0 +1,330 @@
+{
+  "schemaVersion": "1.0",
+  "feature": "001-supervised-autonomous-loop",
+  "checkpoint": "FOUNDATION_FULL_HARDENING",
+  "generatedAt": "2026-09-01T20:25:05Z",
+  "scope": {
+    "tasks": [
+      "T076",
+      "T077",
+      "T078",
+      "T079",
+      "T080",
+      "T081",
+      "T082",
+      "T083",
+      "T084",
+      "T085",
+      "T086"
+    ],
+    "remainingGates": [],
+    "exclusions": [
+      "real providers or provider credentials",
+      "unrestricted repository shell",
+      "OCI or hostile-workload isolation",
+      "production deployment or backup scheduling",
+      "remote Git mutation"
+    ]
+  },
+  "revisions": {
+    "phase8Base": "97012d7024831fe5810b9e2897fa843bdf55d13e",
+    "implementation": "de2f29d640351b219c2be09121784006d9d9bc7e",
+    "evidenceCandidate": "de2f29d640351b219c2be09121784006d9d9bc7e",
+    "fixtureRepository": "857f0f9b02210000000000000000000000000000",
+    "initialPhase8Implementation": "fc6ca399b741c7538118ebd9b1f9d751fe7ebca6",
+    "preRepairReviewCandidate": "39f7416827886fe34ae3f2aab18c4272681bc577"
+  },
+  "environment": {
+    "node": "24.20.0",
+    "pnpm": "11.24.0",
+    "postgresql": "18.4 embedded loopback fixture",
+    "browser": "Playwright 1.62.1 Chromium",
+    "referenceProfile": "foundation-16gb-pve-evaluation",
+    "profileClassification": "FIXTURE_EVIDENCE_TARGET"
+  },
+  "migrations": {
+    "currentVersion": 3,
+    "manifest": [
+      {
+        "version": 1,
+        "name": "foundation",
+        "checksum": "68a98f565058cf66d5cfa0eb49e702708256aeda4d7bb44b4261459402a822b2"
+      },
+      {
+        "version": 2,
+        "name": "start-observe",
+        "checksum": "41650619ada0b572ae9721cbd8110498c4515c7a51548cd4c5f2f345546eee63"
+      },
+      {
+        "version": 3,
+        "name": "verification",
+        "checksum": "6b84c7c62bb30d5d2c190ce6150591120e92c4c24d71db9bb3bdeb0657453cf7"
+      }
+    ],
+    "rollback": "Restore a validated pre-upgrade backup; automatic down migrations are not claimed."
+  },
+  "contractHashes": {
+    "specs/001-supervised-autonomous-loop/contracts/README.md": "sha256:9d4438bdecad24b48d1c1c291851982a46da54f4365cf0fa16f25c4469ab52f1",
+    "specs/001-supervised-autonomous-loop/contracts/event-envelope.schema.json": "sha256:4715220c573d6f0063675593d107b1b9ae49d9a59073995adfe8f7138d84fcf7",
+    "specs/001-supervised-autonomous-loop/contracts/execution-backend.schema.json": "sha256:b4597404ff94409e1c75927f6440c8347b7cb4b835ef080e90ae7a50498bd0a8",
+    "specs/001-supervised-autonomous-loop/contracts/execution-checkpoint.schema.json": "sha256:90a757665fbe8fc601ac5c546fdcbac10a0ac0f99d8c95f12601b1bd1c2da13a",
+    "specs/001-supervised-autonomous-loop/contracts/fake-backend.md": "sha256:eefd2736b77100b7970b555604995cbbc3a35f7e97f230455824d8bd3445e6c5",
+    "specs/001-supervised-autonomous-loop/contracts/http-api.openapi.yaml": "sha256:59a9a28b5fd8201c01202f2be6de49a5d2ab3119a49c2ddcef4f457750476c30",
+    "specs/001-supervised-autonomous-loop/contracts/runner-protocol.schema.json": "sha256:e8b0d7849bc85f93cfe7e91c59bcde2a4558a70381b55c12d82b18fb130b668e",
+    "packages/contracts/src/generated.ts": "sha256:cc456ffeb5728c4526e7732a79789727fa28e0073dbf0c65c1324fbf1244d35d"
+  },
+  "versions": {
+    "policy": {
+      "profileId": "moonshift-foundation",
+      "version": 1,
+      "specialistsDefaultProjectMaximum": 4,
+      "cognitiveConcurrencyDefault": 3,
+      "cognitiveConcurrencyMaximum": 5,
+      "runnerConcurrency": 1
+    },
+    "personas": {
+      "responsibilityVersion": 1,
+      "roles": ["PRODUCT", "ENGINEERING", "QUALITY"],
+      "aggregateCreationVersion": 1
+    },
+    "verification": {
+      "policyId": "moonshift.fixture.verification",
+      "policyVersion": 1,
+      "ruleVersions": {
+        "required-build": 1,
+        "required-coverage": 1,
+        "required-integrity": 1,
+        "required-review": 1,
+        "required-test": 1,
+        "independent-review": 1,
+        "no-blocking-findings": 1
+      }
+    },
+    "fakeBackend": {
+      "family": "FAKE",
+      "adapter": "moonshift-deterministic-fake",
+      "adapterVersion": "1.0.0",
+      "modelDescriptorId": "20000000-0000-4000-8000-000000000002",
+      "modelDescriptorVersion": 1,
+      "conformanceVersion": 1
+    },
+    "runnerProtocol": {
+      "schemaVersion": "1.0",
+      "transport": "TLS 1.3 mutual authentication"
+    }
+  },
+  "artifactHashes": {
+    "verifiedFixtureArtifact": {
+      "artifactId": "025336dc-28c7-5b96-9629-fa70aa1a09fc",
+      "contentHash": "sha256:eef929bd26e81d14d7ba16fe90e8c3c94263821b8ccec555938bbbdef37428c1",
+      "sizeBytes": 274,
+      "gitRevision": "857f0f9b02210000000000000000000000000000",
+      "snapshotMaterialHash": "sha256:26e90af6063f5c7c507ed04b93354f607bb780d4804b50a96ae0a047a89b2c31"
+    },
+    "fixtureSources": {
+      "fixtures/supervised-loop-repository/README.md": "sha256:23fbfb23a84d80ba0c1d438d351663f4a512b6b481ee2fc68090dc1d72c28c9d",
+      "fixtures/supervised-loop-repository/release-notes.md": "sha256:ea65e7502202648c99615e3e071f2049a01343509bc7d9c649c5d96143966c10",
+      "fixtures/supervised-loop-repository/scenario.json": "sha256:b0fa9e33328f060f71eb90a543aac397e21946cbc0c8432209a365d42944b0b3"
+    }
+  },
+  "qualityReview": {
+    "source": "evidence/001-supervised-autonomous-loop/us3/manifest.json",
+    "sourceSha256": "sha256:b957b11544f5247eb88bfb71f69efd097658091bf6b837bdd8b39bc98d2811d0",
+    "authorLineageId": "722a8e2d-0000-4000-8000-000000000012",
+    "reviewerLineageId": "6c2a84bb-0000-4000-8000-000000000014",
+    "independent": true,
+    "decision": "PASSED",
+    "taskState": "VERIFIED"
+  },
+  "independentFinalReview": {
+    "path": "evidence/001-supervised-autonomous-loop/full/review.json",
+    "sha256": "sha256:dd5b51f1964294275fc1f3f92edfad56a5a463609bbe76d06075df79e4cdb88e",
+    "result": "PASS",
+    "blockingFindings": 0
+  },
+  "runnerEvidence": {
+    "authentication": {
+      "command": "pnpm test:runner",
+      "result": "PASS",
+      "testsPassed": 40,
+      "probes": [
+        "TLS 1.3 only",
+        "mutual certificate identity",
+        "forged and role-mismatched certificate rejection",
+        "plaintext rejection",
+        "message replay rejection",
+        "revocation closes authority and fences leases"
+      ]
+    },
+    "resourceDiscovery": {
+      "cgroupVersion": "V2",
+      "enforceable": {
+        "cpu": true,
+        "memory": true,
+        "process": true
+      },
+      "subordinateUidRange": true,
+      "subordinateGidRange": true,
+      "rootlessRuntime": "PODMAN",
+      "rootlessNetwork": "PASTA",
+      "storageDriver": "OVERLAY",
+      "supportsRootlessOci": false,
+      "probeKind": "Injected Linux/PVE-equivalent fixture facts; this is not a claim about the macOS test host."
+    },
+    "fixtureCapacity": {
+      "activeLeases": 1,
+      "maximumJobs": 1,
+      "networkMode": "DENY",
+      "gpuUnits": 0,
+      "arbitraryShell": false,
+      "generalSchedulingEligible": false,
+      "failClosedReason": "MEMORY_NOT_ENFORCEABLE"
+    }
+  },
+  "performance": {
+    "reportPath": "evidence/001-supervised-autonomous-loop/full/capacity-report.json",
+    "reportSha256": "sha256:96595637cd6140cfe83e01829d70382f53ac22538a47bf740048edc1c6dc822c",
+    "sourceReportSha256": "sha256:900c9329e86c21f0e1ec40d49619a5168a308e077bff85b79dcfc42a4bc46f9a",
+    "measurement": {
+      "eventVisibility": "PostgreSQL-authored event time before commit through loopback SSE replay to one submitting Chromium DOM",
+      "cognitiveLoad": "One project, one specialist, default specialist limit four, and 1/3/5 FixtureScheduler executions with exact persisted backend observations",
+      "commandDurability": "Loopback HTTP request to response after PostgreSQL transaction and outbox drain"
+    },
+    "concurrency": {
+      "one": {
+        "projects": 1,
+        "specialists": 1,
+        "cognitiveExecutions": 1,
+        "cognitiveLimit": 3,
+        "eventVisibilityP95Ms": 141,
+        "queueProbe": "COGNITIVE_CAPACITY"
+      },
+      "three": {
+        "projects": 1,
+        "specialists": 1,
+        "cognitiveExecutions": 3,
+        "cognitiveLimit": 3,
+        "eventVisibilityP95Ms": 102,
+        "queueProbe": "COGNITIVE_CAPACITY"
+      },
+      "five": {
+        "projects": 1,
+        "specialists": 1,
+        "cognitiveExecutions": 5,
+        "cognitiveLimit": 5,
+        "eventVisibilityP95Ms": 120,
+        "queueProbe": "COGNITIVE_CAPACITY"
+      }
+    },
+    "commandDurability": {
+      "commands": ["PAUSE", "RESUME", "APPROVE", "STOP", "REJECT", "CANCEL"],
+      "p50Ms": 9.140707999999904,
+      "p95Ms": 69.5260000000003
+    },
+    "process": {
+      "rssBytes": 445218816,
+      "maxRssBytes": 451231744,
+      "availableCpuUnits": 10
+    },
+    "postgresql": {
+      "connections": 1,
+      "waitingLocks": 0,
+      "pendingOutboxEvents": 0,
+      "outboxLagMs": 0,
+      "queuedExecutions": 0,
+      "queueReasons": {
+        "WAITING_FOR_APPROVAL": 2
+      }
+    },
+    "restartInspectionMs": 14.802499999999782,
+    "goalsMet": true
+  },
+  "backupRestore": {
+    "backup": {
+      "finalBytes": 433766,
+      "databaseBytes": 431271,
+      "artifactBytes": 840,
+      "temporaryDiskBytesHighWater": 0,
+      "inMemoryBytesHighWater": 432926
+    },
+    "restore": {
+      "restoredBytes": 432111,
+      "temporaryDiskBytesHighWater": 840,
+      "inMemoryBytesHighWater": 432926,
+      "schedulingDowntimeMs": 83.85750000000007,
+      "projectionValidatedBeforeResume": true,
+      "reconstructionProofRequired": true,
+      "noOpReconstructionRejected": true,
+      "databaseMaintenanceLockEnforced": true,
+      "concurrentControlPlaneWriteWaited": true,
+      "callerSchedulerBooleanTrusted": false
+    },
+    "integrity": "Database rows, artifact bytes, opaque configuration references, contract hashes, migration manifest, ownership, modes, exact file sets, structured reconstruction proof, restored-project checkpoints, and outbox publication state validated before maintenance release allows scheduling to resume."
+  },
+  "provenance": {
+    "lockfileSha256": "sha256:b8d869bfde5139f88339fe3fb1e9577dc808581b990c6df5d3f5590c62168e08",
+    "quickstartSourceSha256": "sha256:a8177af7f5ee6f427fd74aaf5f19a3a2dc1679a4035e093ffdd7b69d99dbb0f5",
+    "retainedEvidence": {
+      "testManifest": {
+        "path": "evidence/001-supervised-autonomous-loop/full/test-manifest.json",
+        "sha256": "sha256:29221d2158b2700434b1d66e2e0f1dd60a30fd937e599dbef137d6a0c821fc9d"
+      },
+      "quickstart": {
+        "path": "evidence/001-supervised-autonomous-loop/full/quickstart.json",
+        "sha256": "sha256:4cedf776d85ae2c6598ae1cd0d848e46b53e981136b7623b3d51a93b8d1210d8"
+      },
+      "requirementsCoverage": {
+        "path": "evidence/001-supervised-autonomous-loop/full/coverage.json",
+        "sha256": "sha256:f55596889081f55173083068368d060f9e5e905c89d503713f535dc300e3a59b",
+        "coveredIdentifiers": 54,
+        "uncoveredIdentifiers": []
+      },
+      "browser": {
+        "path": "evidence/001-supervised-autonomous-loop/full/browser-report.json",
+        "sha256": "sha256:9afdbf5b473bfc4443abd05b6ca3fd2a2f3492bf7d988dbd6faa7138d117f5c2",
+        "sourceSha256": "sha256:2d24eed04963d128430837e32ad7d44a6f655dab28e69bf7f5eaa117a2c91d78"
+      },
+      "capacity": {
+        "path": "evidence/001-supervised-autonomous-loop/full/capacity-report.json",
+        "sha256": "sha256:96595637cd6140cfe83e01829d70382f53ac22538a47bf740048edc1c6dc822c",
+        "sourceSha256": "sha256:900c9329e86c21f0e1ec40d49619a5168a308e077bff85b79dcfc42a4bc46f9a"
+      }
+    },
+    "priorStoryEvidence": {
+      "us3Sha256": "sha256:b957b11544f5247eb88bfb71f69efd097658091bf6b837bdd8b39bc98d2811d0",
+      "us4Sha256": "sha256:c7b022ed1c38ec92ffe9efe24c5aae98a37c1a4339b499ed252fcdea3e47859e",
+      "us5Sha256": "sha256:71e00d6b2323c7136c44c1655eca463162abbfd4ec486780bb7b4af2db04475c"
+    }
+  },
+  "convergence": {
+    "result": "CONVERGED",
+    "functionalRequirementsChecked": 42,
+    "successCriteriaChecked": 12,
+    "acceptanceScenariosChecked": 25,
+    "edgeCasesChecked": 16,
+    "planDecisionAreasChecked": 12,
+    "constitutionPrinciplesChecked": 20,
+    "findings": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    },
+    "tasksAppended": 0,
+    "postRepairAssessment": "The final capacity and restore repairs strengthen T077, T078, FR-014, and the accepted restore plan without introducing unplanned work; no task was appended."
+  },
+  "unresolvedFindings": [],
+  "limitations": [
+    "The measured run is a deterministic local/PVE-equivalent fixture evaluation, not a physical Proxmox host certification.",
+    "Rootless OCI execution, real provider connectivity, hostile repositories, production backup scheduling, and deployment remain outside slice 001."
+  ],
+  "safety": {
+    "realProviderUsed": false,
+    "providerCredentialUsed": false,
+    "unrestrictedShellUsed": false,
+    "externalNetworkEffectPerformed": false,
+    "productionMutationPerformed": false,
+    "remoteGitMutationPerformed": false,
+    "fixtureOnly": true
+  }
+}

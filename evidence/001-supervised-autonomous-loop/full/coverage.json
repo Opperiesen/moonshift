@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "1.0",
+  "feature": "001-supervised-autonomous-loop",
+  "kind": "REQUIREMENT_TO_TEST_EVIDENCE_COVERAGE",
+  "generatedAt": "2026-09-01T20:25:05Z",
+  "gitRevision": "de2f29d640351b219c2be09121784006d9d9bc7e",
+  "mappingSource": {
+    "path": "specs/001-supervised-autonomous-loop/tasks.md",
+    "section": "Requirements Traceability",
+    "semantics": "Each row binds one stable requirement identifier to at least one implementation task and at least one verification or evidence task."
+  },
+  "functionalRequirements": {
+    "declaredCount": 42,
+    "coveredCount": 42,
+    "identifiers": [
+      "FR-001",
+      "FR-002",
+      "FR-003",
+      "FR-004",
+      "FR-005",
+      "FR-006",
+      "FR-007",
+      "FR-008",
+      "FR-009",
+      "FR-010",
+      "FR-011",
+      "FR-012",
+      "FR-013",
+      "FR-014",
+      "FR-015",
+      "FR-016",
+      "FR-017",
+      "FR-018",
+      "FR-019",
+      "FR-020",
+      "FR-021",
+      "FR-022",
+      "FR-023",
+      "FR-024",
+      "FR-025",
+      "FR-026",
+      "FR-027",
+      "FR-028",
+      "FR-029",
+      "FR-030",
+      "FR-031",
+      "FR-032",
+      "FR-033",
+      "FR-034",
+      "FR-035",
+      "FR-036",
+      "FR-037",
+      "FR-038",
+      "FR-039",
+      "FR-040",
+      "FR-041",
+      "FR-042"
+    ]
+  },
+  "successCriteria": {
+    "declaredCount": 12,
+    "coveredCount": 12,
+    "identifiers": [
+      "SC-001",
+      "SC-002",
+      "SC-003",
+      "SC-004",
+      "SC-005",
+      "SC-006",
+      "SC-007",
+      "SC-008",
+      "SC-009",
+      "SC-010",
+      "SC-011",
+      "SC-012"
+    ]
+  },
+  "evidenceSurfaces": [
+    {
+      "task": "T080",
+      "path": "evidence/001-supervised-autonomous-loop/full/test-manifest.json",
+      "coverage": "Unit, contract, PostgreSQL integration, runner-process, browser, recovery, crash-matrix, security, migration, restore, and capacity suites."
+    },
+    {
+      "task": "T081",
+      "path": "evidence/001-supervised-autonomous-loop/full/quickstart.json",
+      "coverage": "Reference journey steps, failure exercises, backup/restore exercise, and teardown."
+    },
+    {
+      "task": "T082",
+      "path": "evidence/001-supervised-autonomous-loop/full/manifest.json",
+      "coverage": "Revision, versions, hashes, independent Quality lineage, resource probes, performance, backup/restore, provenance, limitations, and safety exclusions."
+    }
+  ],
+  "validation": {
+    "requiredIdentifiers": 54,
+    "coveredIdentifiers": 54,
+    "missingIdentifiers": [],
+    "duplicateIdentifiers": [],
+    "unmappedIdentifiers": [],
+    "result": "PASS"
+  },
+  "unresolvedFindings": []
+}

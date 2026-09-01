@@ -1,84 +1,75 @@
 # Current Moonshift Work
 
 - Active feature: `001-supervised-autonomous-loop`
-- Allowed task range: `T069–T075`
-- Checkpoint: `US5 — Inspect a Complete Result and Audit Trail`
-- Status: `US5_COMPLETE`
-- Branch: `codex/us5-results-audit`
-- US4 base: `c47727ac3a9ead1dca243ff22cc5175c10d31b6f`
-- US5 implementation: `6239deb2a8d63e51b2d793c0c0348f2044356fe3`
-- Worktree: clean after the local evidence/continuity checkpoint commit
-- Last updated: `2026-09-01T18:28:16Z`
+- Allowed task range: `T076–T086`
+- Checkpoint: `Phase 8 — Hardening and Cross-Cutting Validation`
+- Status: `PHASE_8_COMPLETE`
+- Branch: `codex/phase8-hardening`
+- Phase 8 base: `97012d7024831fe5810b9e2897fa843bdf55d13e`
+- Validated implementation revision: `de2f29d640351b219c2be09121784006d9d9bc7e`
+- Completion checkpoint: pending in the current evidence/task commit
+- Worktree: evidence, task checkboxes, and this continuity record are pending the completion
+  checkpoint; source changes are committed
+- Last updated: `2026-09-01T20:32:07Z`
 
 ## Completed tasks
 
-`T069–T075` — complete linked Result records; exact connection, backend, model, execution, and
-revision provenance; durable execution/checkpoint history; bijective supervision-audit projection
-with dual audit/project identities and sequences; durable cursor hydration, gap/conflict reload, and
-event deduplication; accessible browser history and truthful terminal states; authenticated loopback
-CLI summary/JSON inspection with safe export; PostgreSQL restart coverage; deterministic contract,
-integration, recovery, and browser evidence; independent review; bounded convergence; and durable
-US5 evidence.
+`T076–T086` — negative security coverage; PostgreSQL migration and validated backup/restore;
+single-project 1/3/5 cognitive-capacity evaluation with default four-specialist topology; resource
+instrumentation and the fixture-only 16 GB PVE profile; all deterministic test manifests; complete
+quickstart and revision-bound evidence; operations/security documentation; zero-finding convergence;
+independent regression/contract/security/scope review; and the final checklist, clean-checkout,
+repository-validation, evidence-integrity, and forbidden-scope gates.
 
 ## First incomplete task
 
-`T076` — hardening negative security tests. This begins Phase 8 and is intentionally outside the
-completed US5 scope; do not start it until the next bounded iteration is explicitly authorized.
+None. Feature `001-supervised-autonomous-loop` is complete through `T086`. Any further feature or
+production-provider work requires a separately authorized specification and task range.
 
 ## Principal files changed
 
-- `apps/control-plane/src/projections/result-detail.ts` — complete linked Result read model,
-  provenance, blockers/recovery, and fail-closed audit mapping
-- `apps/control-plane/src/application/projects/result-history.ts` and project repositories — durable
-  execution/checkpoint history across state transitions and PostgreSQL restart
-- `apps/web/src/services/project-events.ts` and `apps/web/src/features/observe/Observe.tsx` — persisted
-  cursor hydration, ordered replay, deduplication, and projection reload on expiry, gaps, or conflicts
-- `apps/web/src/features/results/Results.tsx` — accessible complete result record, provenance,
-  approvals, execution/checkpoint/effect history, recovery, blockers, and audit timeline
-- `apps/cli/src/commands/project-inspect.ts` — strict shared-contract supervisor inspection and safe
-  summary/JSON export from a loopback endpoint
-- `packages/contracts/` and `specs/001-supervised-autonomous-loop/contracts/http-api.openapi.yaml` —
-  strict ResultView validation and complete public result/audit contract
-- `tests/integration/`, `tests/recovery/control-plane-restart.test.ts`, and
-  `tests/acceptance/results-audit.spec.ts` — linked records, audit identity, reconnect, CLI, restart,
-  accessibility, blockers, and state-truthfulness evidence
-- `evidence/001-supervised-autonomous-loop/us5/manifest.json` — authoritative T075 evidence record
-- `specs/001-supervised-autonomous-loop/tasks.md` — T069–T075 completed; T076 remains unchecked
+- `tests/security/security-boundaries.test.ts` — fail-closed negative security matrix
+- `packages/persistence/src/backup.ts`, `packages/persistence/src/maintenance.ts`, and
+  `tests/recovery/backup-restore.test.ts` — validated restore plus exclusive/shared PostgreSQL
+  maintenance exclusion and deterministic concurrent-write proof
+- `tests/performance/reference-capacity.test.ts` and
+  `tests/performance/fixtures/single-project-cognitive-load.ts` — real fake-backend scheduler work,
+  PostgreSQL/outbox/SSE/Chromium visibility, queue-boundary probes, and resource metrics
+- `apps/runner/src/instrumentation.ts`, `config/observability/reference-capacity.json`, and
+  `deploy/evaluation/proxmox-ve-16gb.json` — fail-closed fixture resource discovery/evaluation
+- `docs/operations/`, `README.md`, and `SECURITY.md` — local evaluation, backup/restore,
+  architecture, limitations, and fixture-only security posture
+- `evidence/001-supervised-autonomous-loop/full/` — canonical test, browser, capacity, coverage,
+  review, convergence, quickstart, and final-validation records
+- `specs/001-supervised-autonomous-loop/tasks.md` — T076–T086 completed
 
 ## Verification evidence
 
-| Command                                            | Result | Notes                                                                                                                                                                 |
-| -------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Focused US5 suite                                  | PASS   | 5 files/46 tests; linked records, complete audit, reconnect/replay, CLI contract/export, and PostgreSQL restart history                                               |
-| Focused recovery suite                             | PASS   | 4 files/28 tests; restart, runtime loss, effect boundaries, fencing, reconciliation, backend switch, and result-history persistence                                   |
-| `pnpm clean && pnpm validate`                      | PASS   | Pinned Node 24.20.0/pnpm 11.24.0; format, lint, boundaries, lockfile, image pins, secrets, typecheck, 91 unit/71 contract/142 integration tests                       |
-| `pnpm test:acceptance`                             | PASS   | 23/23 Chromium tests; complete Results reconnect/reload, actual terminal states, recovery progress, and blockers                                                      |
-| `pnpm --filter @moonshift/web build`               | PASS   | Vite production build completed                                                                                                                                       |
-| `pnpm contracts:generate`                          | PASS   | Contract derivatives generated successfully                                                                                                                           |
-| `node scripts/generate-contract-types.mjs --check` | PASS   | Generated contract types reproduce from approved contracts                                                                                                            |
-| Independent final review                           | PASS   | Fresh post-repair reviewer found no substantive T069–T075 findings                                                                                                    |
-| `$speckit-converge` bounded to T069–T075           | PASS   | 3 US5 scenarios, FR-034–FR-036, SC-008/SC-010/SC-011, plan, constitution, tasks, implementation, tests, and evidence align; no task appended; T076+ was not evaluated |
-| `git diff --check`                                 | PASS   | No whitespace errors                                                                                                                                                  |
+| Command or gate               | Result | Notes                                                                                                                                                                   |
+| ----------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| All eleven quickstart suites  | PASS   | 91 unit, 71 contract, 114 PostgreSQL integration, 40 runner, 23 Chromium, 33 recovery, 9 crash-matrix, 15 security, 1 migration, 5 restore, and 1 capacity test         |
+| `pnpm clean && pnpm validate` | PASS   | Pinned Node.js 24.20.0/pnpm 11.24.0; formatting, lint, boundaries, lockfile, image pins, secret scan, typecheck, and every repository-native deterministic suite passed |
+| Fresh isolated checkout       | PASS   | Frozen offline install reused 196 packages with zero download, then typecheck, 71 contracts, 40 runner tests, and 23 Chromium tests passed with no tracked changes      |
+| Independent final review      | PASS   | Fresh post-repair Terra reviewer found zero blocking findings across regression, contracts, security, scope, capacity semantics, and restore exclusion                  |
+| `$speckit-converge`           | PASS   | 42 FRs, 12 success criteria, 25 acceptance scenarios, 16 edge cases, 12 plan areas, and 20 constitution principles checked; zero findings and zero tasks appended       |
+| Required checklists           | PASS   | Nine files, 138 checked items, zero unchecked items                                                                                                                     |
+| Evidence integrity            | PASS   | Canonical report hashes and the implementation revision match the final manifest                                                                                        |
+| `git diff --check`            | PASS   | No whitespace errors                                                                                                                                                    |
 
-## Open findings
+## Open findings and bounded limitations
 
-- The host exposes Node.js `26.7.0` and pnpm `11.19.0`; validation must continue through the pinned
-  Node.js `24.20.0` and pnpm `11.24.0` wrapper.
-- `docker` and `psql` are not on `PATH`; deterministic integration validation uses the approved
-  embedded PostgreSQL 18.4 server.
-- US5 inspects controlled fixture state only. It uses no real provider credential, unrestricted
-  shell, external network effect, remote Git mutation, or production mutation.
-- The CLI accepts only a loopback HTTP endpoint, obtains its supervisor session from
-  `MOONSHIFT_SESSION_COOKIE`, never exposes a cookie argument, and creates exports exclusively with
-  owner-only mode `0600`.
-- Result audit projection fails closed when a durable supervision audit record cannot be assigned to
-  a unique compatible project-event carrier; it never fabricates an audit or evidence execution ID.
-- Independent review drove repairs for complete material-action audit mapping, exact dual audit/event
-  identity, terminal execution timing, durable reconnect hydration, working-directory-independent
-  contract loading, strict CLI response validation, and PostgreSQL history coverage. The final fresh
-  review reported no substantive findings.
+- No unresolved implementation, convergence, review, security, or validation finding remains.
+- The host defaults remain outside repository pins; all authoritative validation used the pinned
+  Node.js 24.20.0/pnpm 11.24.0 wrapper.
+- Capacity and resource results are deterministic local/PVE-equivalent fixture evidence, not a
+  physical Proxmox certification or real-provider load guarantee.
+- Rootless OCI execution, hostile repositories, real provider connectivity and credentials,
+  production backup scheduling, deployment, and remote Git mutation remain outside feature 001.
+- Restore's internal trusted callback receives the exclusive-lock-owning PostgreSQL client and must
+  continue to use the maintenance-aware recovery entry point to avoid self-waiting.
 
 ## Exact next action
 
-US5 is complete; stop here. T076 begins hardening and must remain untouched until the next explicitly
-authorized bounded iteration.
+Create the local Phase 8 feature-completion commit containing the canonical evidence, completed
+T076–T086 task state, and this continuity record. Do not push. Afterward, record the resulting commit
+hash here in a final continuity-only checkpoint.
