@@ -163,7 +163,16 @@ export function projectResults(record: ProjectRecord): ResultView {
     checkpoints: Object.freeze(
       record.supervision.checkpoint === null
         ? []
-        : [Object.freeze({ ...record.supervision.checkpoint, schemaVersion: '1.0' as const })],
+        : [
+            Object.freeze({
+              checkpointId: record.supervision.checkpoint.checkpointId,
+              executionId: record.supervision.checkpoint.execution.executionId,
+              schemaVersion: record.supervision.checkpoint.schemaVersion,
+              contentHash: record.supervision.checkpoint.contentHash,
+              gitRevision: record.supervision.checkpoint.repository.revision,
+              createdAt: record.supervision.checkpoint.createdAt,
+            }),
+          ],
     ),
     effects: record.supervision.effects,
     organizationLineage: Object.freeze({

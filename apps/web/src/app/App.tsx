@@ -3,7 +3,9 @@ import { Projects } from '../features/projects/Projects.js';
 import { Observe } from '../features/observe/Observe.js';
 import { Supervise } from '../features/supervise/Supervise.js';
 import { Results } from '../features/results/Results.js';
-import { bootstrap, type ProjectView } from '../services/project-api.js';
+import { bootstrap, getProject, type ProjectView } from '../services/project-api.js';
+
+const ACTIVE_PROJECT_KEY = 'moonshift.activeProjectId';
 export function App() {
   const [session, setSession] = useState<'loading' | 'ready' | 'error'>('loading');
   const [project, setProject] = useState<ProjectView>();
@@ -11,13 +13,22 @@ export function App() {
   useEffect(() => {
     const secret = new URLSearchParams(location.hash.slice(1)).get('bootstrap');
     history.replaceState(null, '', location.pathname + location.search);
-    if (!secret) {
-      setSession('ready');
-      return;
-    }
-    void bootstrap(secret)
-      .then(() => setSession('ready'))
-      .catch(() => setSession('error'));
+    void (async () => {
+      try {
+        if (secret) await bootstrap(secret);
+        const projectId = localStorage.getItem(ACTIVE_PROJECT_KEY);
+        if (projectId !== null) {
+          try {
+            setProject(await getProject(projectId));
+          } catch {
+            localStorage.removeItem(ACTIVE_PROJECT_KEY);
+          }
+        }
+        setSession('ready');
+      } catch {
+        setSession('error');
+      }
+    })();
   }, []);
   if (session === 'loading') return <p role="status">Connecting to Moonshift…</p>;
   if (session === 'error')
@@ -31,6 +42,7 @@ export function App() {
     return (
       <Projects
         onCreated={(created) => {
+          localStorage.setItem(ACTIVE_PROJECT_KEY, created.projectId);
           setProject(created);
           setView('observe');
         }}
@@ -52,7 +64,13 @@ export function App() {
       {view === 'observe' ? (
         <Observe initial={project} />
       ) : view === 'supervise' ? (
-        <Supervise initial={project} onProjectChange={setProject} />
+        <Supervise
+          initial={project}
+          onProjectChange={(changed) => {
+            localStorage.setItem(ACTIVE_PROJECT_KEY, changed.projectId);
+            setProject(changed);
+          }}
+        />
       ) : (
         <Results projectId={project.projectId} />
       )}

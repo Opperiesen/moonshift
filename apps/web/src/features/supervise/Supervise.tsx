@@ -145,7 +145,7 @@ export function Supervise({
         : 'Active fixture authority';
 
   return (
-    <main>
+    <main data-project-id={project.projectId}>
       <h1>Supervise</h1>
       <p role="status">{status}</p>
       <button
@@ -279,6 +279,28 @@ export function Supervise({
             Cancel project
           </button>
         </div>
+      </section>
+
+      <section aria-labelledby="recovery-heading">
+        <h2 id="recovery-heading">Recovery</h2>
+        <p data-testid="recovery-status">
+          {view?.recovery.state === 'SAFE_CHECKPOINT'
+            ? 'Safe checkpoint preserved'
+            : (view?.recovery.progress ?? 'No recovery is in progress')}
+        </p>
+        <p data-testid="recovery-checkpoint">
+          {view?.checkpoint === null || view?.checkpoint === undefined
+            ? 'No durable checkpoint'
+            : `Checkpoint ${view.checkpoint.contentHash} · ${view.checkpoint.createdAt}`}
+        </p>
+        {view?.recovery.state === 'BLOCKED_UNKNOWN' ? (
+          <p>Inspect the effect ledger, establish ground truth, then retry reconciliation.</p>
+        ) : null}
+        {view?.recovery.state === 'BLOCKED_RECOVERY' ? (
+          <p>
+            Inspect or restore the durable checkpoint and event history before retrying recovery.
+          </p>
+        ) : null}
       </section>
     </main>
   );

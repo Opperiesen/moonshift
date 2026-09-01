@@ -450,6 +450,7 @@ export class ProjectService {
         });
         const record: ProjectRecord = Object.freeze({
           fixtureScenario: command.fixtureScenario,
+          taskDefinition: Object.freeze({ objective, acceptanceCriteria }),
           view,
           organization: Object.freeze({ specialist, delegation }),
           scheduling,

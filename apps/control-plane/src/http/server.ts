@@ -26,6 +26,8 @@ import {
   type ApprovedEffectExecutor,
 } from '../application/supervision/index.js';
 import { VerificationService } from '../application/verification/index.js';
+import { RecoveryService } from '../application/recovery/index.js';
+import { reconstructDurableState } from '../bootstrap/recovery.js';
 import { LoopbackSessionManager } from './session.js';
 import { registerSupervisionRoutes } from './supervision.js';
 
@@ -344,6 +346,7 @@ export function createFixtureControlPlane(input: {
   readonly supervision: SupervisionService;
   readonly effectExecutor: InMemoryApprovedEffectExecutor;
   readonly verification: VerificationService;
+  readonly recovery: RecoveryService;
   readonly artifactStore: FsArtifactStore;
   readonly advanceTime: (milliseconds: number) => void;
   readonly resetTime: () => void;
@@ -390,6 +393,12 @@ export function createFixtureControlPlane(input: {
     systemId,
     engineId: randomUUID(),
   });
+  const recovery = new RecoveryService({
+    repository,
+    effectExecutor,
+    nextId: randomUUID,
+    systemId,
+  });
   const server = createControlPlaneServer({
     service,
     repository,
@@ -407,6 +416,7 @@ export function createFixtureControlPlane(input: {
     supervision,
     effectExecutor,
     verification,
+    recovery,
     artifactStore,
     advanceTime: (milliseconds) => {
       fixtureTime += milliseconds;
@@ -430,6 +440,14 @@ export function createPostgresControlPlane(input: {
   readonly version?: string;
   readonly effectExecutor: ApprovedEffectExecutor;
   readonly artifactRoot?: string;
+  readonly recoveryScanIntervalMs?: number;
+  readonly heartbeatTimeoutMs?: number;
+  readonly recoveryBackendConnections?: ConstructorParameters<
+    typeof RecoveryService
+  >[0]['backendConnections'];
+  readonly afterRemoteRecovery?: ConstructorParameters<
+    typeof RecoveryService
+  >[0]['afterRemoteRecovery'];
 }): {
   readonly server: FastifyInstance;
   readonly sessions: LoopbackSessionManager;
@@ -438,6 +456,8 @@ export function createPostgresControlPlane(input: {
   readonly scheduler: FixtureScheduler;
   readonly supervision: SupervisionService;
   readonly verification: VerificationService;
+  readonly recovery: RecoveryService;
+  readonly scanRuntimeRecovery: () => Promise<readonly string[]>;
   readonly artifactStore: FsArtifactStore;
 } {
   const now = input.now ?? (() => new Date());
@@ -476,6 +496,18 @@ export function createPostgresControlPlane(input: {
     systemId,
     engineId: nextId(),
   });
+  const recovery = new RecoveryService({
+    repository,
+    effectExecutor: input.effectExecutor,
+    nextId,
+    systemId,
+    ...(input.recoveryBackendConnections === undefined
+      ? {}
+      : { backendConnections: input.recoveryBackendConnections }),
+    ...(input.afterRemoteRecovery === undefined
+      ? {}
+      : { afterRemoteRecovery: input.afterRemoteRecovery }),
+  });
   const server = createControlPlaneServer({
     service,
     repository,
@@ -483,6 +515,39 @@ export function createPostgresControlPlane(input: {
     verification,
     sessions,
     ...(input.version === undefined ? {} : { version: input.version }),
+  });
+  const heartbeatTimeoutMs = input.heartbeatTimeoutMs ?? 30_000;
+  const scanRuntimeRecovery = () =>
+    recovery.recoverStaleRuntimes({ heartbeatTimeoutMs, correlationId: nextId });
+  let recoveryTimer: ReturnType<typeof setInterval> | undefined;
+  server.addHook('onReady', async () => {
+    const reconstructed = await reconstructDurableState({ repository, pool: input.pool });
+    for (const project of reconstructed.projects) {
+      if (project.disposition === 'RESUME_ELIGIBLE') {
+        if (project.sourceExecutionId === null) throw new Error('RECOVERY_EXECUTION_ID_MISSING');
+        await recovery.recoverLostRuntime({
+          projectId: project.projectId,
+          sourceExecutionId: project.sourceExecutionId,
+          correlationId: nextId(),
+        });
+      } else if (project.disposition === 'BLOCKED') {
+        await recovery.blockUnrecoverableProject({
+          projectId: project.projectId,
+          sourceExecutionId: project.sourceExecutionId,
+          reason: project.blockedReason ?? 'Startup recovery validation failed closed',
+          correlationId: nextId(),
+        });
+      }
+    }
+    recoveryTimer = setInterval(() => {
+      void scanRuntimeRecovery().catch((error: unknown) =>
+        server.log.error({ err: error }, 'runtime recovery scan failed'),
+      );
+    }, input.recoveryScanIntervalMs ?? 30_000);
+    recoveryTimer.unref();
+  });
+  server.addHook('onClose', async () => {
+    if (recoveryTimer !== undefined) clearInterval(recoveryTimer);
   });
   if (input.artifactRoot === undefined) {
     server.addHook('onClose', async () => rm(artifactRoot, { recursive: true, force: true }));
@@ -495,6 +560,8 @@ export function createPostgresControlPlane(input: {
     scheduler,
     supervision,
     verification,
+    recovery,
+    scanRuntimeRecovery,
     artifactStore,
   };
 }

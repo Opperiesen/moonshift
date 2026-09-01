@@ -58,36 +58,30 @@ export class InMemoryApprovedEffectExecutor implements ApprovedEffectExecutor {
     string,
     { readonly actionDigest: Sha256Digest; readonly groundTruthDigest: Sha256Digest }
   >();
+  private readonly fixtureGroundTruth = new Map<string, EffectGroundTruth>();
+  private readonly revokedFenceByEffect = new Map<string, number>();
+  private readonly effectQueues = new Map<string, Promise<void>>();
 
-  async execute(input: ApprovedEffectExecution) {
-    assertApprovedEffectExecution(input);
-    const existing = this.effects.get(input.effectId);
-    if (existing !== undefined) {
-      if (existing.actionDigest !== input.actionDigest)
-        throw new Error('Fixture effect identity reused with another action digest');
-      return Object.freeze({ outcome: 'ALREADY_APPLIED' as const, ...existing });
+  private async withEffectLock<T>(effectId: string, work: () => Promise<T> | T): Promise<T> {
+    const previous = this.effectQueues.get(effectId) ?? Promise.resolve();
+    let release = (): void => undefined;
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const queued = previous.then(() => current);
+    this.effectQueues.set(effectId, queued);
+    await previous;
+    try {
+      return await work();
+    } finally {
+      release();
+      if (this.effectQueues.get(effectId) === queued) this.effectQueues.delete(effectId);
     }
-    const groundTruthDigest = `sha256:${createHash('sha256')
-      .update(
-        JSON.stringify({
-          actionDigest: input.actionDigest,
-          effectId: input.effectId,
-          marker: 'APPROVED',
-        }),
-      )
-      .digest('hex')}` as const;
-    this.effects.set(
-      input.effectId,
-      Object.freeze({ actionDigest: input.actionDigest, groundTruthDigest }),
-    );
-    return Object.freeze({ outcome: 'APPLIED' as const, groundTruthDigest });
   }
 
-  async revoke(input: EffectAuthorityReference): Promise<EffectGroundTruth> {
-    return this.lookup(input);
-  }
-
-  async lookup(input: EffectAuthorityReference) {
+  private groundTruth(input: EffectAuthorityReference): EffectGroundTruth {
+    const fixtureTruth = this.fixtureGroundTruth.get(input.effectId);
+    if (fixtureTruth !== undefined) return fixtureTruth;
     const existing = this.effects.get(input.effectId);
     if (existing === undefined)
       return Object.freeze({ outcome: 'NOT_APPLIED' as const, groundTruthDigest: null });
@@ -99,8 +93,57 @@ export class InMemoryApprovedEffectExecutor implements ApprovedEffectExecutor {
     });
   }
 
+  async execute(input: ApprovedEffectExecution) {
+    assertApprovedEffectExecution(input);
+    return this.withEffectLock(input.effectId, () => {
+      const revokedFence = this.revokedFenceByEffect.get(input.effectId) ?? 0;
+      if (input.fencingToken <= revokedFence) throw new Error('STALE_RUNTIME_FENCE');
+      const existing = this.effects.get(input.effectId);
+      if (existing !== undefined) {
+        if (existing.actionDigest !== input.actionDigest)
+          throw new Error('Fixture effect identity reused with another action digest');
+        return Object.freeze({ outcome: 'ALREADY_APPLIED' as const, ...existing });
+      }
+      const groundTruthDigest = `sha256:${createHash('sha256')
+        .update(
+          JSON.stringify({
+            actionDigest: input.actionDigest,
+            effectId: input.effectId,
+            marker: 'APPROVED',
+          }),
+        )
+        .digest('hex')}` as const;
+      this.effects.set(
+        input.effectId,
+        Object.freeze({ actionDigest: input.actionDigest, groundTruthDigest }),
+      );
+      return Object.freeze({ outcome: 'APPLIED' as const, groundTruthDigest });
+    });
+  }
+
+  async revoke(input: EffectAuthorityReference): Promise<EffectGroundTruth> {
+    return this.withEffectLock(input.effectId, () => {
+      this.revokedFenceByEffect.set(
+        input.effectId,
+        Math.max(this.revokedFenceByEffect.get(input.effectId) ?? 0, input.fencingToken),
+      );
+      return this.groundTruth(input);
+    });
+  }
+
+  async lookup(input: EffectAuthorityReference) {
+    return this.withEffectLock(input.effectId, () => this.groundTruth(input));
+  }
+
   clear(): void {
     this.effects.clear();
+    this.fixtureGroundTruth.clear();
+    this.revokedFenceByEffect.clear();
+    this.effectQueues.clear();
+  }
+
+  setFixtureGroundTruth(effectId: string, truth: EffectGroundTruth): void {
+    this.fixtureGroundTruth.set(effectId, Object.freeze({ ...truth }));
   }
 }
 
@@ -153,6 +196,7 @@ export function buildFixtureSupervision(input: {
     runnerLeaseId,
     runnerLeaseState: 'ACTIVE' as const,
     runnerLeaseExpiresAt: input.authorityLeaseExpiresAt,
+    runnerLastHeartbeatAt: input.authorityNow,
     fencingToken: 1,
     successor: false,
   });
@@ -167,6 +211,15 @@ export function buildFixtureSupervision(input: {
     }),
     authority,
     checkpoint: null,
+    recovery: Object.freeze({
+      state: 'IDLE' as const,
+      sourceExecutionId: null,
+      successorExecutionId: null,
+      sourceConnectionId: null,
+      targetConnectionId: null,
+      progress: 'No recovery is in progress',
+      updatedAt: input.authorityNow,
+    }),
     verification: Object.freeze({
       state: 'NONE' as const,
     }),

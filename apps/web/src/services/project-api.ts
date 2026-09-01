@@ -54,6 +54,20 @@ export interface SupervisionView {
     readonly runnerLeaseState: 'ACTIVE' | 'REVOKED';
     readonly successor: boolean;
   };
+  readonly checkpoint: {
+    readonly checkpointId: string;
+    readonly contentHash: `sha256:${string}`;
+    readonly createdAt: string;
+  } | null;
+  readonly recovery: {
+    readonly state: string;
+    readonly sourceExecutionId: string | null;
+    readonly successorExecutionId: string | null;
+    readonly sourceConnectionId: string | null;
+    readonly targetConnectionId: string | null;
+    readonly progress: string;
+    readonly updatedAt: string;
+  };
   readonly effects: readonly {
     readonly effectId: string;
     readonly taskId: string;

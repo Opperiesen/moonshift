@@ -34,6 +34,9 @@ function readJson(path: string): AnySchemaObject {
 }
 
 const eventEnvelopeSchema = readJson(resolve(contractRoot, 'event-envelope.schema.json'));
+const executionCheckpointSchema = readJson(
+  resolve(contractRoot, 'execution-checkpoint.schema.json'),
+);
 const executionBackendSchema = readJson(resolve(contractRoot, 'execution-backend.schema.json'));
 const runnerProtocolSchema = readJson(resolve(contractRoot, 'runner-protocol.schema.json'));
 const openapi = YAML.parse(
@@ -163,6 +166,7 @@ const runnerBase = {
 describe('planning contract source validity', () => {
   it.each([
     ['event envelope', eventEnvelopeSchema],
+    ['execution checkpoint', executionCheckpointSchema],
     ['execution backend', executionBackendSchema],
     ['runner protocol', runnerProtocolSchema],
   ])(

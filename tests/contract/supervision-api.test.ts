@@ -81,6 +81,8 @@ describe('supervision HTTP contract', () => {
       }>;
       budget: Record<string, unknown>;
       authority: Record<string, unknown>;
+      checkpoint: Record<string, unknown> | null;
+      recovery: Record<string, unknown>;
       effects: Array<Record<string, unknown>>;
       blockedReasons: string[];
       projectState: string;
@@ -91,6 +93,8 @@ describe('supervision HTTP contract', () => {
         'items',
         'budget',
         'authority',
+        'checkpoint',
+        'recovery',
         'effects',
         'blockedReasons',
         'projectState',

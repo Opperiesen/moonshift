@@ -86,6 +86,10 @@ export type FakeResumeCommand = {
   readonly correlationId: string;
   readonly sentAt: string;
   readonly executionId: string;
+  readonly sourceExecutionId?: string;
+  readonly agentId?: string;
+  readonly taskId?: string;
+  readonly contextManifestId?: string;
   readonly modelDescriptorId: string;
   readonly modelDescriptorVersion: number;
   readonly checkpointId: string;
@@ -165,6 +169,17 @@ const NEXT_SEQUENCE_BY_CURSOR = Object.freeze({
   AFTER_EFFECT: 8,
 } as const);
 
+function validCheckpointPosition(checkpoint: {
+  readonly cursor: FakeCheckpoint['cursor'];
+  readonly nextSequence: number;
+}): boolean {
+  const boundarySequence = NEXT_SEQUENCE_BY_CURSOR[checkpoint.cursor];
+  return (
+    checkpoint.nextSequence === boundarySequence ||
+    (checkpoint.cursor === 'AFTER_EFFECT' && checkpoint.nextSequence === 9)
+  );
+}
+
 type CheckpointSnapshot = Omit<FakeCheckpoint, 'id' | 'contentHash'>;
 
 function checkpointSnapshot(checkpoint: CheckpointSnapshot): string {
@@ -207,7 +222,7 @@ export function createFakeCheckpoint(input: {
     nextSequence:
       input.nextSequence ?? NEXT_SEQUENCE_BY_CURSOR[input.cursor ?? 'BEFORE_TOOL_INTENT'],
   } as const;
-  if (snapshot.nextSequence !== NEXT_SEQUENCE_BY_CURSOR[snapshot.cursor])
+  if (!validCheckpointPosition(snapshot))
     throw new Error('Invalid fake checkpoint cursor/sequence pairing');
   const contentHash = sha256(checkpointSnapshot(snapshot));
   return Object.freeze({ ...snapshot, id: uuidFrom(contentHash), contentHash });
@@ -219,7 +234,7 @@ function assertCheckpoint(checkpoint: FakeCheckpoint): void {
     checkpoint.modelDescriptorId !== FAKE_MODEL_DESCRIPTOR.id ||
     checkpoint.modelDescriptorVersion !== FAKE_MODEL_DESCRIPTOR.version ||
     !Number.isInteger(checkpoint.nextSequence) ||
-    checkpoint.nextSequence !== NEXT_SEQUENCE_BY_CURSOR[checkpoint.cursor]
+    !validCheckpointPosition(checkpoint)
   ) {
     throw new Error('Invalid or incompatible provider-neutral checkpoint');
   }
@@ -579,21 +594,38 @@ export function createFakeExecutionBackend(
         command.modelDescriptorVersion,
       );
       assertCheckpoint(checkpoint);
+      const sourceExecutionId = command.sourceExecutionId ?? command.executionId;
+      const agentId = command.agentId ?? checkpoint.agentId;
+      const taskId = command.taskId ?? checkpoint.taskId;
+      const contextManifestId = command.contextManifestId ?? checkpoint.contextManifestId;
       if (
         command.checkpointId !== checkpoint.id ||
         command.checkpointHash !== checkpoint.contentHash ||
-        command.executionId !== checkpoint.executionId ||
+        sourceExecutionId !== checkpoint.executionId ||
+        agentId !== checkpoint.agentId ||
+        taskId !== checkpoint.taskId ||
         checkpoint.modelDescriptorId !== command.modelDescriptorId ||
-        checkpoint.modelDescriptorVersion !== command.modelDescriptorVersion
+        checkpoint.modelDescriptorVersion !== command.modelDescriptorVersion ||
+        (command.executionId !== checkpoint.executionId && command.sourceExecutionId === undefined)
       ) {
         throw new Error('Invalid or incompatible provider-neutral checkpoint');
       }
+      const successorCheckpoint = createFakeCheckpoint({
+        executionId: command.executionId,
+        agentId,
+        taskId,
+        contextManifestId,
+        scenario: checkpoint.scenario,
+        seed: checkpoint.seed,
+        cursor: checkpoint.cursor,
+        nextSequence: checkpoint.nextSequence,
+      });
       return resultFrom({
         connectionId,
         executionId: command.executionId,
         correlationId: command.correlationId,
         sentAt: dependencies.now().toISOString(),
-        checkpoint,
+        checkpoint: successorCheckpoint,
         resumeFrom: checkpoint,
       });
     },

@@ -32,14 +32,30 @@ export interface ProjectRepository {
   create(input: CreateProjectRecordInput): Promise<{ reused: boolean; record: ProjectRecord }>;
   authorityNow(): Promise<string>;
   get(projectId: string): Promise<ProjectRecord | null>;
+  list(): Promise<readonly ProjectRecord[]>;
   listEvents(projectId: string, afterSequence: number): Promise<readonly ProjectEvent[]>;
   expireEventsBefore(projectId: string, sequence: number): Promise<void>;
   assertVersion(projectId: string, expectedVersion: number): Promise<void>;
+  recordRuntimeHeartbeat(input: RuntimeHeartbeatInput): Promise<RuntimeHeartbeatResult>;
   mutate<T>(input: MutateProjectRecordInput<T>): Promise<{
     readonly reused: boolean;
     readonly response: T;
     readonly record: ProjectRecord;
   }>;
+}
+
+export interface RuntimeHeartbeatInput {
+  readonly projectId: string;
+  readonly executionId: string;
+  readonly leaseId: string;
+  readonly ownerId: string;
+  readonly fencingToken: number;
+}
+
+export interface RuntimeHeartbeatResult {
+  readonly accepted: boolean;
+  readonly authorityNow: string;
+  readonly leaseExpiresAt: string | null;
 }
 
 export interface MutateProjectRecordInput<T> {
@@ -164,6 +180,14 @@ export class InMemoryProjectRepository implements ProjectRepository {
     return this.projects.get(projectId) ?? null;
   }
 
+  async list(): Promise<readonly ProjectRecord[]> {
+    return Object.freeze(
+      [...this.projects.values()].sort((left, right) =>
+        left.view.projectId.localeCompare(right.view.projectId),
+      ),
+    );
+  }
+
   async listEvents(projectId: string, afterSequence: number): Promise<readonly ProjectEvent[]> {
     const record = this.projects.get(projectId);
     if (record === undefined) return [];
@@ -190,6 +214,50 @@ export class InMemoryProjectRepository implements ProjectRepository {
       throw new ControlPlaneError('PROJECT_NOT_FOUND', 'Project not found', 404);
     if (current !== expectedVersion)
       throw new ProjectVersionConflictError(expectedVersion, current);
+  }
+
+  async recordRuntimeHeartbeat(input: RuntimeHeartbeatInput): Promise<RuntimeHeartbeatResult> {
+    const previous = this.operationQueue;
+    let release = (): void => undefined;
+    this.operationQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      const now = this.authorityClock();
+      const authorityNow = now.toISOString();
+      const record = this.projects.get(input.projectId);
+      const authority = record?.supervision.authority;
+      const accepted =
+        record !== undefined &&
+        record.view.status === 'ACTIVE' &&
+        authority?.executionId === input.executionId &&
+        authority.runnerLeaseId === input.leaseId &&
+        authority.runnerLeaseState === 'ACTIVE' &&
+        authority.fencingToken === input.fencingToken &&
+        record.scheduling.runtime.connectionId === input.ownerId &&
+        Date.parse(authority.runnerLeaseExpiresAt) > now.getTime();
+      if (!accepted || record === undefined || authority === undefined)
+        return Object.freeze({ accepted: false, authorityNow, leaseExpiresAt: null });
+      const leaseExpiresAt = new Date(now.getTime() + 300_000).toISOString();
+      this.projects.set(
+        input.projectId,
+        Object.freeze({
+          ...record,
+          supervision: Object.freeze({
+            ...record.supervision,
+            authority: Object.freeze({
+              ...authority,
+              runnerLastHeartbeatAt: authorityNow,
+              runnerLeaseExpiresAt: leaseExpiresAt,
+            }),
+          }),
+        }),
+      );
+      return Object.freeze({ accepted: true, authorityNow, leaseExpiresAt });
+    } finally {
+      release();
+    }
   }
 
   async mutate<T>(input: MutateProjectRecordInput<T>): Promise<{
@@ -392,6 +460,35 @@ export class InMemoryProjectRepository implements ProjectRepository {
           }),
         }),
         events: Object.freeze([...record.events, ...events]),
+      }),
+    );
+  }
+
+  setFixtureEffectState(
+    projectId: string,
+    state: ProjectRecord['supervision']['effects'][number]['state'],
+  ): void {
+    const record = this.projects.get(projectId);
+    if (record === undefined) throw new Error('Project not found');
+    const effect = record.supervision.effects[0];
+    if (effect === undefined) throw new Error('Fixture effect not found');
+    this.projects.set(
+      projectId,
+      Object.freeze({
+        ...record,
+        supervision: Object.freeze({
+          ...record.supervision,
+          effects: Object.freeze([
+            Object.freeze({
+              ...effect,
+              state,
+              reconciliationOutcome:
+                state === 'UNKNOWN' ? 'RECONCILIATION_REQUIRED' : effect.reconciliationOutcome,
+              version: effect.version + 1,
+            }),
+            ...record.supervision.effects.slice(1),
+          ]),
+        }),
       }),
     );
   }

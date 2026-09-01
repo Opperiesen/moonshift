@@ -16,6 +16,7 @@ export interface OwnedValidator {
 
 export interface PlanningValidators {
   readonly eventEnvelope: OwnedValidator;
+  readonly executionCheckpoint: OwnedValidator;
   readonly executionBackend: OwnedValidator;
   readonly runnerProtocol: OwnedValidator;
 }
@@ -136,6 +137,7 @@ export function createPlanningValidators(): PlanningValidators {
   const ajv = createAjv();
   return Object.freeze({
     eventEnvelope: compile(ajv, loadSchema('event-envelope.schema.json')),
+    executionCheckpoint: compile(ajv, loadSchema('execution-checkpoint.schema.json')),
     executionBackend: compile(ajv, loadSchema('execution-backend.schema.json')),
     runnerProtocol: compile(ajv, loadSchema('runner-protocol.schema.json')),
   });

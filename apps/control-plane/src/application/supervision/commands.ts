@@ -18,6 +18,7 @@ import type {
   SupervisionRecord,
 } from '../../model.js';
 import { appendSupervisionMutation } from '../../projections/supervision-events.js';
+import { checkpointFromProjectRecord } from '../recovery/checkpoints.js';
 import { commandRequestHash, type ProjectRepository } from '../projects/repository.js';
 import type { ApprovedEffectExecutor } from './tool-policy.js';
 
@@ -393,6 +394,15 @@ export class SupervisionService {
       ),
       budget: current.budget,
       authority: current.authority,
+      checkpoint:
+        current.checkpoint === null
+          ? null
+          : Object.freeze({
+              checkpointId: current.checkpoint.checkpointId,
+              contentHash: current.checkpoint.contentHash,
+              createdAt: current.checkpoint.createdAt,
+            }),
+      recovery: current.recovery,
       effects: current.effects,
       blockedReasons: current.blockedReasons,
       projectState: current.projectState,
@@ -484,6 +494,10 @@ export class SupervisionService {
             tasks: rejected ? updateTaskState(record, 'BLOCKED') : record.view.tasks,
             supervision: {
               ...record.supervision,
+              authority: Object.freeze({
+                ...record.supervision.authority,
+                runnerLastHeartbeatAt: authorityNow,
+              }),
               approvals,
               effects,
               toolInvocationState: state,
@@ -1636,18 +1650,11 @@ export class SupervisionService {
           ];
           if (command.command === 'PAUSE') {
             const checkpointId = this.dependencies.nextId();
-            const checkpoint = Object.freeze({
+            const checkpoint = checkpointFromProjectRecord({
+              record,
               checkpointId,
-              executionId: record.supervision.authority.executionId,
-              contentHash: sha256(
-                JSON.stringify({
-                  executionId: record.supervision.authority.executionId,
-                  projectId: command.projectId,
-                  version: record.view.version,
-                }),
-              ),
-              gitRevision: this.dependencies.expectedRevision,
               createdAt: authorityNow,
+              reason: 'PAUSE',
             });
             const staleReason = 'Project reached PAUSED before verification commit';
             const evaluating = record.verification.evaluations.filter(
@@ -1723,6 +1730,15 @@ export class SupervisionService {
               }),
               verification: supervisionVerification,
               checkpoint,
+              recovery: Object.freeze({
+                state: 'SAFE_CHECKPOINT' as const,
+                sourceExecutionId: record.supervision.authority.executionId,
+                successorExecutionId: null,
+                sourceConnectionId: record.scheduling.execution.connectionId,
+                targetConnectionId: null,
+                progress: 'Safe checkpoint preserved for supervisor-controlled resume',
+                updatedAt: authorityNow,
+              }),
               blockedReasons:
                 evaluating.length > 0
                   ? Object.freeze([staleReason])
@@ -1889,10 +1905,21 @@ export class SupervisionService {
                 runnerLeaseId: this.dependencies.nextId(),
                 runnerLeaseState: 'ACTIVE',
                 runnerLeaseExpiresAt: new Date(Date.parse(authorityNow) + 300_000).toISOString(),
+                runnerLastHeartbeatAt: authorityNow,
                 fencingToken: record.supervision.authority.fencingToken + 1,
                 successor: true,
               }),
               verification: record.supervision.verification,
+              recovery: Object.freeze({
+                ...record.supervision.recovery,
+                state: 'RESUMED' as const,
+                sourceExecutionId:
+                  record.supervision.checkpoint?.execution.executionId ??
+                  record.supervision.authority.executionId,
+                successorExecutionId: executionId,
+                progress: 'Resumed from durable checkpoint with fresh fenced authority',
+                updatedAt: authorityNow,
+              }),
               blockedReasons: Object.freeze([]),
             };
             scheduling = Object.freeze({
@@ -1943,18 +1970,11 @@ export class SupervisionService {
               ),
             );
             const checkpointId = this.dependencies.nextId();
-            const checkpoint = Object.freeze({
+            const checkpoint = checkpointFromProjectRecord({
+              record,
               checkpointId,
-              executionId: record.supervision.authority.executionId,
-              contentHash: sha256(
-                JSON.stringify({
-                  executionId: record.supervision.authority.executionId,
-                  projectId: command.projectId,
-                  version: record.view.version,
-                }),
-              ),
-              gitRevision: this.dependencies.expectedRevision,
               createdAt: authorityNow,
+              reason: 'STOP',
             });
             supervision = {
               ...record.supervision,
@@ -1974,6 +1994,15 @@ export class SupervisionService {
                 runnerLeaseState: 'REVOKED',
               }),
               checkpoint,
+              recovery: Object.freeze({
+                state: 'SAFE_CHECKPOINT' as const,
+                sourceExecutionId: record.supervision.authority.executionId,
+                successorExecutionId: null,
+                sourceConnectionId: record.scheduling.execution.connectionId,
+                targetConnectionId: null,
+                progress: 'Safe checkpoint preserved after authority revocation',
+                updatedAt: authorityNow,
+              }),
               blockedReasons:
                 cancelled && !requiresEffectReconciliation
                   ? Object.freeze(['Project cancelled'])

@@ -8,7 +8,12 @@ export default defineConfig({
     projects: [
       { test: { name: 'unit', include: ['packages/**/src/**/*.test.ts'] } },
       { test: { name: 'contract', include: ['tests/contract/**/*.test.ts'] } },
-      { test: { name: 'integration', include: ['tests/integration/**/*.test.ts'] } },
+      {
+        test: {
+          name: 'integration',
+          include: ['tests/integration/**/*.test.ts', 'tests/recovery/**/*.test.ts'],
+        },
+      },
     ],
   },
 });

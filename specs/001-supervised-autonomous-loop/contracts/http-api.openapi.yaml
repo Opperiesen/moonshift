@@ -830,7 +830,7 @@ components:
     SupervisionView:
       type: object
       additionalProperties: false
-      required: [items, budget, authority, effects, blockedReasons, projectState, projectVersion]
+      required: [items, budget, authority, checkpoint, recovery, effects, blockedReasons, projectState, projectVersion]
       properties:
         items:
           type: array
@@ -840,6 +840,12 @@ components:
           $ref: "#/components/schemas/SupervisionBudgetView"
         authority:
           $ref: "#/components/schemas/SupervisionAuthorityView"
+        checkpoint:
+          oneOf:
+            - $ref: "#/components/schemas/SupervisionCheckpointView"
+            - type: "null"
+        recovery:
+          $ref: "#/components/schemas/RecoveryView"
         effects:
           type: array
           items:
@@ -873,7 +879,7 @@ components:
     SupervisionAuthorityView:
       type: object
       additionalProperties: false
-      required: [executionId, executionAttempt, executionState, capabilityLeaseId, capabilityLeaseState, capabilityLeaseExpiresAt, runnerLeaseId, runnerLeaseState, runnerLeaseExpiresAt, fencingToken, successor]
+      required: [executionId, executionAttempt, executionState, capabilityLeaseId, capabilityLeaseState, capabilityLeaseExpiresAt, runnerLeaseId, runnerLeaseState, runnerLeaseExpiresAt, runnerLastHeartbeatAt, fencingToken, successor]
       properties:
         executionId:
           type: string
@@ -901,12 +907,64 @@ components:
         runnerLeaseExpiresAt:
           type: string
           format: date-time
+        runnerLastHeartbeatAt:
+          type: string
+          format: date-time
         fencingToken:
           type: integer
           minimum: 1
           maximum: 9007199254740991
         successor:
           type: boolean
+    SupervisionCheckpointView:
+      type: object
+      additionalProperties: false
+      required: [checkpointId, contentHash, createdAt]
+      properties:
+        checkpointId:
+          type: string
+          format: uuid
+        contentHash:
+          type: string
+          pattern: "^sha256:[a-f0-9]{64}$"
+        createdAt:
+          type: string
+          format: date-time
+    RecoveryView:
+      type: object
+      additionalProperties: false
+      required: [state, sourceExecutionId, successorExecutionId, sourceConnectionId, targetConnectionId, progress, updatedAt]
+      properties:
+        state:
+          type: string
+          enum: [IDLE, SAFE_CHECKPOINT, RUNTIME_LOST, RECONCILING, SWITCHING_BACKEND, RESUMED, BLOCKED_UNKNOWN, BLOCKED_RECOVERY]
+        sourceExecutionId:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: "null"
+        successorExecutionId:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: "null"
+        sourceConnectionId:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: "null"
+        targetConnectionId:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: "null"
+        progress:
+          type: string
+          minLength: 1
+          maxLength: 512
+        updatedAt:
+          type: string
+          format: date-time
     ResultView:
       type: object
       additionalProperties: false

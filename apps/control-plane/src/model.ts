@@ -15,6 +15,7 @@ import type {
   VerificationEvidence,
   VerificationPolicy,
 } from '@moonshift/verification';
+import type { ExecutionCheckpoint } from './application/recovery/checkpoints.js';
 
 export type FixtureScenario =
   | 'PASS'
@@ -147,7 +148,7 @@ export interface RouteDecision {
   readonly selectedConnectionId: string;
   readonly modelDescriptorId: string;
   readonly modelDescriptorVersion: number;
-  readonly reasonCode: 'FIXTURE_PRIMARY_SELECTED';
+  readonly reasonCode: 'FIXTURE_PRIMARY_SELECTED' | 'RECOVERY_COMPATIBLE_BACKEND_SELECTED';
 }
 
 export interface SchedulingResult {
@@ -267,16 +268,28 @@ export interface SupervisionRecord {
     readonly runnerLeaseId: string;
     readonly runnerLeaseState: 'ACTIVE' | 'REVOKED';
     readonly runnerLeaseExpiresAt: string;
+    readonly runnerLastHeartbeatAt: string;
     readonly fencingToken: number;
     readonly successor: boolean;
   };
-  readonly checkpoint: {
-    readonly checkpointId: string;
-    readonly executionId: string;
-    readonly contentHash: `sha256:${string}`;
-    readonly gitRevision: string;
-    readonly createdAt: string;
-  } | null;
+  readonly checkpoint: ExecutionCheckpoint | null;
+  readonly recovery: {
+    readonly state:
+      | 'IDLE'
+      | 'SAFE_CHECKPOINT'
+      | 'RUNTIME_LOST'
+      | 'RECONCILING'
+      | 'SWITCHING_BACKEND'
+      | 'RESUMED'
+      | 'BLOCKED_UNKNOWN'
+      | 'BLOCKED_RECOVERY';
+    readonly sourceExecutionId: string | null;
+    readonly successorExecutionId: string | null;
+    readonly sourceConnectionId: string | null;
+    readonly targetConnectionId: string | null;
+    readonly progress: string;
+    readonly updatedAt: string;
+  };
   readonly verification: {
     readonly state: 'NONE' | 'EVALUATING' | 'STALE';
   };
@@ -304,6 +317,10 @@ export interface VerificationRecord {
 
 export interface ProjectRecord {
   readonly fixtureScenario: FixtureScenario;
+  readonly taskDefinition: {
+    readonly objective: string;
+    readonly acceptanceCriteria: readonly string[];
+  };
   readonly view: ProjectView;
   readonly organization: ProjectOrganization;
   readonly scheduling: SchedulingResult;

@@ -7,11 +7,14 @@ import {
   ProjectVersionConflictError,
 } from '../../errors.js';
 import type { ProjectEvent, ProjectRecord } from '../../model.js';
+import { drainProjectOutbox } from '../../projections/project-outbox.js';
 import type {
   CreateProjectRecordInput,
   MutateProjectRecordInput,
   ProjectCapacitySnapshot,
   ProjectRepository,
+  RuntimeHeartbeatInput,
+  RuntimeHeartbeatResult,
 } from './repository.js';
 
 async function transaction<T>(pool: Pool, work: (client: PoolClient) => Promise<T>): Promise<T> {
@@ -64,6 +67,111 @@ async function capacitySnapshot(client: PoolClient): Promise<ProjectCapacitySnap
   });
 }
 
+async function persistProjectEvent(client: PoolClient, event: ProjectEvent): Promise<void> {
+  await client.query(
+    `INSERT INTO project_events (event_id, project_id, project_sequence, envelope)
+     VALUES ($1, $2, $3, $4)`,
+    [event.eventId, event.projectId, event.sequence, event],
+  );
+  await client.query(
+    `INSERT INTO outbox_events
+       (event_id, project_id, project_sequence, aggregate_type, aggregate_id,
+        aggregate_version, payload)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      event.eventId,
+      event.projectId,
+      event.sequence,
+      event.aggregate.type,
+      event.aggregate.id,
+      event.aggregate.version,
+      event,
+    ],
+  );
+}
+
+async function syncExecutionQueue(client: PoolClient, record: ProjectRecord): Promise<void> {
+  const execution = record.scheduling.execution;
+  const queued = execution.state === 'QUEUED';
+  await client.query(
+    `INSERT INTO queue_items
+       (queue_item_id, queue_name, payload, status, completed_at)
+     VALUES ($1, 'execution', $2, $3, CASE WHEN $3 = 'COMPLETED' THEN clock_timestamp() END)
+     ON CONFLICT (queue_item_id) DO NOTHING`,
+    [
+      execution.executionId,
+      {
+        projectId: record.view.projectId,
+        executionId: execution.executionId,
+        taskId: execution.taskId,
+      },
+      queued ? 'AVAILABLE' : 'COMPLETED',
+    ],
+  );
+  await client.query(
+    `UPDATE queue_items
+     SET payload = $2,
+         status = CASE WHEN $3::boolean THEN status ELSE 'COMPLETED' END,
+         completed_at = CASE
+           WHEN $3::boolean THEN completed_at
+           ELSE COALESCE(completed_at, clock_timestamp())
+         END,
+         claimed_by = CASE WHEN $3::boolean THEN claimed_by ELSE NULL END,
+         claimed_at = CASE WHEN $3::boolean THEN claimed_at ELSE NULL END,
+         claim_expires_at = CASE WHEN $3::boolean THEN claim_expires_at ELSE NULL END
+     WHERE queue_item_id = $1`,
+    [
+      execution.executionId,
+      {
+        projectId: record.view.projectId,
+        executionId: execution.executionId,
+        taskId: execution.taskId,
+      },
+      queued,
+    ],
+  );
+}
+
+async function syncRuntimeLease(client: PoolClient, record: ProjectRecord): Promise<void> {
+  const authority = record.supervision.authority;
+  const projectId = record.view.projectId;
+  if (authority.runnerLeaseState !== 'ACTIVE') {
+    await client.query(
+      `UPDATE leases
+       SET status = 'REVOKED', updated_at = clock_timestamp()
+       WHERE resource_type = 'PROJECT_RUNTIME' AND resource_id = $1 AND status = 'ACTIVE'`,
+      [projectId],
+    );
+    return;
+  }
+  await client.query(
+    `UPDATE leases
+     SET status = 'REVOKED', updated_at = clock_timestamp()
+     WHERE resource_type = 'PROJECT_RUNTIME' AND resource_id = $1
+       AND status = 'ACTIVE' AND lease_id <> $2`,
+    [projectId, authority.runnerLeaseId],
+  );
+  await client.query(
+    `INSERT INTO leases
+       (lease_id, resource_type, resource_id, owner_id, fencing_token, expires_at, status)
+     VALUES ($1, 'PROJECT_RUNTIME', $2, $3, $4, $5, $6)
+     ON CONFLICT (lease_id) DO UPDATE
+     SET owner_id = EXCLUDED.owner_id,
+         fencing_token = $4,
+         expires_at = EXCLUDED.expires_at,
+         status = EXCLUDED.status,
+         updated_at = clock_timestamp()`,
+    [
+      authority.runnerLeaseId,
+      projectId,
+      record.scheduling.runtime.connectionId,
+      authority.fencingToken,
+      authority.runnerLeaseExpiresAt,
+      authority.runnerLeaseState,
+    ],
+  );
+}
+
 export class PostgresProjectRepository implements ProjectRepository {
   constructor(private readonly pool: Pool) {}
 
@@ -80,7 +188,7 @@ export class PostgresProjectRepository implements ProjectRepository {
   async create(
     input: CreateProjectRecordInput,
   ): Promise<{ reused: boolean; record: ProjectRecord }> {
-    return transaction(this.pool, async (client) => {
+    const result = await transaction(this.pool, async (client) => {
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
         'project-capacity',
       ]);
@@ -115,12 +223,10 @@ export class PostgresProjectRepository implements ProjectRepository {
         [projectId, record.view.version, record],
       );
       for (const event of record.events) {
-        await client.query(
-          `INSERT INTO project_events (event_id, project_id, project_sequence, envelope)
-           VALUES ($1, $2, $3, $4)`,
-          [event.eventId, projectId, event.sequence, event],
-        );
+        await persistProjectEvent(client, event);
       }
+      await syncExecutionQueue(client, record);
+      await syncRuntimeLease(client, record);
       await client.query(
         `INSERT INTO idempotency_records (scope, idempotency_key, request_hash, response)
          VALUES ('projects', $1, $2, $3)`,
@@ -128,6 +234,13 @@ export class PostgresProjectRepository implements ProjectRepository {
       );
       return { reused: false, record };
     });
+    await drainProjectOutbox({
+      pool: this.pool,
+      workerId: 'control-plane-project-events',
+      projectId: result.record.view.projectId,
+      expectedLastSequence: result.record.view.lastSequence,
+    });
+    return result;
   }
 
   async get(projectId: string): Promise<ProjectRecord | null> {
@@ -136,6 +249,13 @@ export class PostgresProjectRepository implements ProjectRepository {
       [projectId],
     );
     return result.rows[0]?.record ?? null;
+  }
+
+  async list(): Promise<readonly ProjectRecord[]> {
+    const result = await this.pool.query<{ record: ProjectRecord }>(
+      'SELECT record FROM project_snapshots ORDER BY project_id',
+    );
+    return Object.freeze(result.rows.map(({ record }) => record));
   }
 
   async listEvents(projectId: string, afterSequence: number): Promise<readonly ProjectEvent[]> {
@@ -192,12 +312,89 @@ export class PostgresProjectRepository implements ProjectRepository {
       throw new ProjectVersionConflictError(expectedVersion, current);
   }
 
+  async recordRuntimeHeartbeat(input: RuntimeHeartbeatInput): Promise<RuntimeHeartbeatResult> {
+    return transaction(this.pool, async (client) => {
+      await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
+        `project:${input.projectId}`,
+      ]);
+      const nowResult = await client.query<{ authority_now: Date }>(
+        'SELECT clock_timestamp() AS authority_now',
+      );
+      const now = nowResult.rows[0]?.authority_now;
+      if (now === undefined) throw new Error('PostgreSQL authority clock unavailable');
+      const authorityNow = now.toISOString();
+      const snapshot = await client.query<{ record: ProjectRecord }>(
+        `SELECT record FROM project_snapshots WHERE project_id = $1 FOR UPDATE`,
+        [input.projectId],
+      );
+      const record = snapshot.rows[0]?.record;
+      if (record === undefined)
+        return Object.freeze({ accepted: false, authorityNow, leaseExpiresAt: null });
+      const authority = record.supervision.authority;
+      const lease = await client.query(
+        `SELECT 1 FROM leases
+         WHERE resource_type = 'PROJECT_RUNTIME'
+           AND resource_id = $1
+           AND lease_id = $2
+           AND owner_id = $3
+           AND fencing_token = $4
+           AND status = 'ACTIVE'
+           AND expires_at > $5
+         FOR UPDATE`,
+        [input.projectId, input.leaseId, input.ownerId, input.fencingToken, now],
+      );
+      const accepted =
+        record.view.status === 'ACTIVE' &&
+        authority.executionId === input.executionId &&
+        authority.runnerLeaseId === input.leaseId &&
+        authority.runnerLeaseState === 'ACTIVE' &&
+        authority.fencingToken === input.fencingToken &&
+        record.scheduling.runtime.connectionId === input.ownerId &&
+        (lease.rowCount ?? 0) === 1;
+      if (!accepted) return Object.freeze({ accepted: false, authorityNow, leaseExpiresAt: null });
+
+      const leaseExpiresAt = new Date(now.getTime() + 300_000).toISOString();
+      const nextRecord = Object.freeze({
+        ...record,
+        supervision: Object.freeze({
+          ...record.supervision,
+          authority: Object.freeze({
+            ...authority,
+            runnerLastHeartbeatAt: authorityNow,
+            runnerLeaseExpiresAt: leaseExpiresAt,
+          }),
+        }),
+      });
+      const renewed = await client.query(
+        `UPDATE leases
+         SET expires_at = $5, updated_at = $6
+         WHERE resource_type = 'PROJECT_RUNTIME'
+           AND resource_id = $1
+           AND lease_id = $2
+           AND owner_id = $3
+           AND fencing_token = $4
+           AND status = 'ACTIVE'
+           AND expires_at > $6`,
+        [input.projectId, input.leaseId, input.ownerId, input.fencingToken, leaseExpiresAt, now],
+      );
+      if ((renewed.rowCount ?? 0) !== 1)
+        return Object.freeze({ accepted: false, authorityNow, leaseExpiresAt: null });
+      await client.query(
+        `UPDATE project_snapshots
+         SET record = $2, updated_at = $3
+         WHERE project_id = $1`,
+        [input.projectId, nextRecord, now],
+      );
+      return Object.freeze({ accepted: true, authorityNow, leaseExpiresAt });
+    });
+  }
+
   async mutate<T>(input: MutateProjectRecordInput<T>): Promise<{
     readonly reused: boolean;
     readonly response: T;
     readonly record: ProjectRecord;
   }> {
-    return transaction(this.pool, async (client) => {
+    const result = await transaction(this.pool, async (client) => {
       if (input.reserveCognitiveCapacity || input.reserveRunnerCapacity) {
         await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
           'project-capacity',
@@ -259,12 +456,10 @@ export class PostgresProjectRepository implements ProjectRepository {
       for (const event of changed.record.events.filter(
         ({ sequence }) => sequence > current.record.view.lastSequence,
       )) {
-        await client.query(
-          `INSERT INTO project_events (event_id, project_id, project_sequence, envelope)
-           VALUES ($1, $2, $3, $4)`,
-          [event.eventId, input.projectId, event.sequence, event],
-        );
+        await persistProjectEvent(client, event);
       }
+      await syncExecutionQueue(client, changed.record);
+      await syncRuntimeLease(client, changed.record);
       await client.query(
         `INSERT INTO idempotency_records (scope, idempotency_key, request_hash, response)
          VALUES ($1, $2, $3, $4)`,
@@ -272,5 +467,12 @@ export class PostgresProjectRepository implements ProjectRepository {
       );
       return { reused: false, response: changed.response, record: changed.record };
     });
+    await drainProjectOutbox({
+      pool: this.pool,
+      workerId: 'control-plane-project-events',
+      projectId: result.record.view.projectId,
+      expectedLastSequence: result.record.view.lastSequence,
+    });
+    return result;
   }
 }

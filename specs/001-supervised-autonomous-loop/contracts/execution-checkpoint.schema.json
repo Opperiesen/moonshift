@@ -1,0 +1,237 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://moonshift.dev/contracts/execution-checkpoint.schema.json",
+  "title": "Moonshift Execution Checkpoint",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "checkpointId",
+    "contentHash",
+    "createdAt",
+    "reason",
+    "project",
+    "task",
+    "specialist",
+    "execution",
+    "repository",
+    "decisions",
+    "openQuestions",
+    "toolResults",
+    "artifacts",
+    "evidence",
+    "remainingWork",
+    "context",
+    "budget",
+    "leases",
+    "effects",
+    "continuation"
+  ],
+  "$defs": {
+    "uuid": { "type": "string", "format": "uuid" },
+    "hash": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "stringList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "maxItems": 100
+    },
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "contentHash"],
+      "properties": {
+        "id": { "$ref": "#/$defs/uuid" },
+        "kind": { "type": "string", "minLength": 1 },
+        "contentHash": { "$ref": "#/$defs/hash" }
+      }
+    }
+  },
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "checkpointId": { "$ref": "#/$defs/uuid" },
+    "contentHash": { "$ref": "#/$defs/hash" },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "reason": {
+      "enum": ["PAUSE", "STOP", "RUNTIME_LOST", "BACKEND_SWITCH", "EFFECT_RECONCILIATION"]
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["projectId", "objective", "status", "version", "lastSequence"],
+      "properties": {
+        "projectId": { "$ref": "#/$defs/uuid" },
+        "objective": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "minLength": 1 },
+        "version": { "type": "integer", "minimum": 1 },
+        "lastSequence": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "taskId",
+        "title",
+        "state",
+        "assigneeAgentId",
+        "expectedRevision",
+        "acceptanceCriteria"
+      ],
+      "properties": {
+        "taskId": { "$ref": "#/$defs/uuid" },
+        "title": { "type": "string", "minLength": 1 },
+        "state": { "type": "string", "minLength": 1 },
+        "assigneeAgentId": { "oneOf": [{ "$ref": "#/$defs/uuid" }, { "type": "null" }] },
+        "expectedRevision": { "type": "string", "minLength": 1 },
+        "acceptanceCriteria": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "specialist": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agentId", "lineageId", "role"],
+      "properties": {
+        "agentId": { "$ref": "#/$defs/uuid" },
+        "lineageId": { "$ref": "#/$defs/uuid" },
+        "role": { "type": "string", "minLength": 1 }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executionId",
+        "runtimeId",
+        "connectionId",
+        "modelDescriptorId",
+        "modelDescriptorVersion",
+        "contextManifestId"
+      ],
+      "properties": {
+        "executionId": { "$ref": "#/$defs/uuid" },
+        "runtimeId": { "$ref": "#/$defs/uuid" },
+        "connectionId": { "$ref": "#/$defs/uuid" },
+        "modelDescriptorId": { "$ref": "#/$defs/uuid" },
+        "modelDescriptorVersion": { "type": "integer", "minimum": 1 },
+        "contextManifestId": { "$ref": "#/$defs/uuid" }
+      }
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "diffState", "worktreeRef"],
+      "properties": {
+        "revision": { "type": "string", "minLength": 1 },
+        "diffState": { "enum": ["CLEAN", "DIRTY"] },
+        "worktreeRef": { "type": "string", "minLength": 1 }
+      }
+    },
+    "decisions": { "$ref": "#/$defs/stringList" },
+    "openQuestions": { "$ref": "#/$defs/stringList" },
+    "toolResults": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reference" },
+      "maxItems": 100
+    },
+    "artifacts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reference" },
+      "maxItems": 100
+    },
+    "evidence": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reference" },
+      "maxItems": 100
+    },
+    "remainingWork": { "$ref": "#/$defs/stringList" },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifestId", "manifestHash", "compilerPolicyVersion"],
+      "properties": {
+        "manifestId": { "$ref": "#/$defs/uuid" },
+        "manifestHash": { "$ref": "#/$defs/hash" },
+        "compilerPolicyVersion": { "type": "string", "minLength": 1 }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invocationLimit",
+        "consumedInvocations",
+        "monetaryLimitMicros",
+        "consumedMonetaryMicros"
+      ],
+      "properties": {
+        "invocationLimit": { "type": "integer", "minimum": 0 },
+        "consumedInvocations": { "type": "integer", "minimum": 0 },
+        "monetaryLimitMicros": { "type": "integer", "minimum": 0 },
+        "consumedMonetaryMicros": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "leases": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capabilityLeaseId",
+        "capabilityLeaseState",
+        "capabilityLeaseExpiresAt",
+        "runnerLeaseId",
+        "runnerLeaseState",
+        "runnerLeaseExpiresAt",
+        "runnerLastHeartbeatAt",
+        "fencingToken"
+      ],
+      "properties": {
+        "capabilityLeaseId": { "$ref": "#/$defs/uuid" },
+        "capabilityLeaseState": { "enum": ["ACTIVE", "SUSPENDED", "REVOKED"] },
+        "capabilityLeaseExpiresAt": { "type": "string", "format": "date-time" },
+        "runnerLeaseId": { "$ref": "#/$defs/uuid" },
+        "runnerLeaseState": { "enum": ["ACTIVE", "REVOKED"] },
+        "runnerLeaseExpiresAt": { "type": "string", "format": "date-time" },
+        "runnerLastHeartbeatAt": { "type": "string", "format": "date-time" },
+        "fencingToken": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "effects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "effectId",
+          "actionDigest",
+          "semanticKey",
+          "state",
+          "reconciliationOutcome",
+          "groundTruthDigest"
+        ],
+        "properties": {
+          "effectId": { "$ref": "#/$defs/uuid" },
+          "actionDigest": { "$ref": "#/$defs/hash" },
+          "semanticKey": { "type": "string", "minLength": 1 },
+          "state": { "type": "string", "minLength": 1 },
+          "reconciliationOutcome": { "type": ["string", "null"] },
+          "groundTruthDigest": { "oneOf": [{ "$ref": "#/$defs/hash" }, { "type": "null" }] }
+        }
+      },
+      "maxItems": 100
+    },
+    "continuation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scenario", "seed", "cursor", "nextSequence", "normalizedWorkHash"],
+      "properties": {
+        "scenario": { "type": "string", "minLength": 1 },
+        "seed": { "type": "string", "minLength": 1 },
+        "cursor": {
+          "enum": ["BEFORE_TOOL_INTENT", "BEFORE_EFFECT", "DURING_EFFECT", "AFTER_EFFECT"]
+        },
+        "nextSequence": { "type": "integer", "minimum": 1 },
+        "normalizedWorkHash": { "$ref": "#/$defs/hash" }
+      }
+    },
+    "backendSessionHint": { "type": "string", "minLength": 1, "maxLength": 512 }
+  }
+}
