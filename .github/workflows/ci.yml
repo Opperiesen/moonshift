@@ -21,8 +21,8 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm validate
       - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm validate
       - run: pnpm test:acceptance
         env:
           CI: true
