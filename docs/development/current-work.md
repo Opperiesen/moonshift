@@ -12,8 +12,9 @@
 - Public-readiness checkpoint: `5b06975895054a252ca4589858caf050bf8a0760`
 - Public CI repair checkpoint: `12f69f46ff90f4db1eea7d3b8d3dce8e2d72c6bb`
 - Public CI portability checkpoint: `2cb6852944c371af0bf7345754ec6ce779a7c8b5`
+- Public CI stability checkpoint: `569fb850657966e26512013d428fa46dba10e065`
 - Worktree: clean after the continuity-only checkpoint; no Feature 002 implementation task has started
-- Last updated: `2026-09-01T23:20:03Z`
+- Last updated: `2026-09-01T23:30:57Z`
 
 ## Completed public-repository preparation
 
@@ -36,8 +37,11 @@
 - The synchronized Linux run then exposed an OpenSSL 3.0 portability gap in deterministic certificate
   fixtures. The final repair signs fixed-date certificates through the portable `openssl ca` path,
   asserts the exact validity window, and moves the CI actions to their supported Node 24 generations.
-  Local pinned validation, acceptance tests, and fresh independent review pass; remote main CI remains
-  the last publication check after synchronization.
+- Public run `33570909718` proved the Linux install, OpenSSL, and current Actions repairs, then exposed
+  a stale-version race in one in-flight STOP test. The test now holds the applied runner result until
+  STOP has durably reconciled the `EXECUTING` boundary, without changing production concurrency or
+  adding retries. Local pinned validation, acceptance tests, and fresh independent review pass; a new
+  remote main run remains the last publication check after synchronization.
 
 ## Completed lifecycle preparation
 
@@ -98,6 +102,7 @@ incomplete task.
 | Public GitHub security            | PASS   | Visibility, metadata, Apache-2.0 detection, 100% community profile, private reporting, dependency alerts/updates, secret scanning/push protection, and external-fork approval verified                                  |
 | Public CI cold-install repair     | PASS   | Exact native build approvals, host boundary, Dependabot policy, unchanged lockfile, pinned install, full `pnpm validate`, and fresh independent review pass locally; remote main run pending synchronization            |
 | Public CI OpenSSL portability     | PASS   | 55 targeted tests, full pinned validation, 23 Chromium tests, workflow YAML validation, and fresh independent review pass; remote main run pending synchronization                                                      |
+| Public CI concurrency stability   | PASS   | Stale-version race diagnosed, 10 consecutive targeted runs, full pinned validation, 23 Chromium tests, and fresh independent review pass; new remote main run pending synchronization                                   |
 
 ## Open findings and bounded limitations
 
@@ -118,7 +123,7 @@ incomplete task.
 
 ## Exact next action
 
-Synchronize the final public CI portability checkpoint and require one green `main` CI run. Confirm
-that Dependabot applies the minor/patch policy without leaving obsolete major-update pull requests.
-Then, in a separate task, start T001–T035 at T001 and do not begin T036 until the US1 checkpoint has
-been accepted.
+Synchronize the final public CI stability checkpoint and require one green `main` CI run. Confirm that
+Dependabot applies the minor/patch policy without leaving obsolete major-update pull requests. Then,
+in a separate task, start T001–T035 at T001 and do not begin T036 until the US1 checkpoint has been
+accepted.
