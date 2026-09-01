@@ -13,8 +13,9 @@
 - Public CI repair checkpoint: `12f69f46ff90f4db1eea7d3b8d3dce8e2d72c6bb`
 - Public CI portability checkpoint: `2cb6852944c371af0bf7345754ec6ce779a7c8b5`
 - Public CI stability checkpoint: `569fb850657966e26512013d428fa46dba10e065`
+- Public CI browser-bootstrap checkpoint: `ca3c0bff73b5328c936bd0dd2101032f1f34dfc3`
 - Worktree: clean after the continuity-only checkpoint; no Feature 002 implementation task has started
-- Last updated: `2026-09-01T23:30:57Z`
+- Last updated: `2026-09-01T23:34:14Z`
 
 ## Completed public-repository preparation
 
@@ -40,8 +41,11 @@
 - Public run `33570909718` proved the Linux install, OpenSSL, and current Actions repairs, then exposed
   a stale-version race in one in-flight STOP test. The test now holds the applied runner result until
   STOP has durably reconciled the `EXECUTING` boundary, without changing production concurrency or
-  adding retries. Local pinned validation, acceptance tests, and fresh independent review pass; a new
-  remote main run remains the last publication check after synchronization.
+  adding retries. Public run `33571439073` proved that repair and reached the capacity test, where it
+  exposed that Chromium was installed after `pnpm validate` despite being required during validation.
+  The workflow now bootstraps Chromium first. Local pinned validation, acceptance tests, workflow
+  checks, and fresh independent review pass; a new remote main run remains the last publication check
+  after synchronization.
 
 ## Completed lifecycle preparation
 
@@ -103,6 +107,7 @@ incomplete task.
 | Public CI cold-install repair     | PASS   | Exact native build approvals, host boundary, Dependabot policy, unchanged lockfile, pinned install, full `pnpm validate`, and fresh independent review pass locally; remote main run pending synchronization            |
 | Public CI OpenSSL portability     | PASS   | 55 targeted tests, full pinned validation, 23 Chromium tests, workflow YAML validation, and fresh independent review pass; remote main run pending synchronization                                                      |
 | Public CI concurrency stability   | PASS   | Stale-version race diagnosed, 10 consecutive targeted runs, full pinned validation, 23 Chromium tests, and fresh independent review pass; new remote main run pending synchronization                                   |
+| Public CI browser bootstrap       | PASS   | Chromium installation now precedes the capacity test inside `pnpm validate`; workflow formatting, YAML/order checks, and fresh independent review pass; new remote main run pending synchronization                     |
 
 ## Open findings and bounded limitations
 
