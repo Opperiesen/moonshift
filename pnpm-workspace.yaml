@@ -3,7 +3,9 @@ packages:
   - packages/*
 
 allowBuilds:
-  '@embedded-postgres/darwin-arm64': true
+  # Keep exact native-script approvals synchronized with embedded-postgres updates.
+  '@embedded-postgres/darwin-arm64@18.4.0-beta.17': true
+  '@embedded-postgres/linux-x64@18.4.0-beta.17': true
 
 strictDepBuilds: true
 strictPeerDependencies: true

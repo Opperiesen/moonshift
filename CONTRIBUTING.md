@@ -40,6 +40,11 @@ No provider, harness, subscription, or user credential is required for the curre
 implementation. Never add credentials, tokens, cookies, authentication caches, private keys, or
 private model reasoning to code, fixtures, logs, issues, or artifacts.
 
+The current local path is validated only on macOS ARM64 and Linux x64. A dependency update that
+changes `embedded-postgres` or its native packages must update the exact versioned `allowBuilds`
+entries in `pnpm-workspace.yaml` in the same pull request; unexpected native build scripts fail
+closed.
+
 ## Proposing a change
 
 - Use the issue forms for reproducible bugs and bounded feature proposals.

@@ -5,6 +5,11 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
+    allow:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch
     groups:
       development-dependencies:
         dependency-type: development
@@ -16,3 +21,8 @@ updates:
     schedule:
       interval: monthly
     open-pull-requests-limit: 3
+    allow:
+      - dependency-name: '*'
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-patch

@@ -79,8 +79,10 @@ capacity, and 23 Chromium acceptance tests**. See the
 
 ## Evaluate the alpha locally
 
-Prerequisites: Node.js `24.x`, Corepack, Git, and a modern browser. PostgreSQL integration tests can
-use the repository's embedded deterministic test path, so no provider or user credential is needed.
+Prerequisites: a macOS ARM64 or Linux x64 host, Node.js `24.x`, Corepack, Git, and a modern browser.
+These are the only host platforms validated for the current alpha; native dependency scripts fail
+closed elsewhere. PostgreSQL integration tests can use the repository's embedded deterministic test
+path, so no provider or user credential is needed.
 
 ```bash
 corepack enable

@@ -5,6 +5,8 @@ slice. It is a developer and test-fixture workflow, not an installation or produ
 
 ## Prerequisites
 
+- A macOS ARM64 or Linux x64 host. These are the only platforms validated for the current alpha;
+  native dependency build scripts intentionally fail closed on other platforms.
 - Node.js `24.x` (the repository engine range is `>=24 <25`), with Corepack enabled.
 - pnpm `11.24.0` (the `packageManager` field and lockfile are pinned to this version).
 - Git.
@@ -13,6 +15,10 @@ slice. It is a developer and test-fixture workflow, not an installation or produ
 - A modern browser only for the Playwright acceptance suite.
 
 No provider, harness, subscription, or user credential is required or expected.
+
+Dependency updates that change `embedded-postgres` or one of its platform packages must update the
+exact versioned `allowBuilds` entries in `pnpm-workspace.yaml` in the same revision. Unexpected native
+scripts remain a hard installation failure under `strictDepBuilds`.
 
 ## Commands that exist today
 
