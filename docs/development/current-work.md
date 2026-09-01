@@ -31,9 +31,10 @@ stops before implementation.
 
 ## First incomplete task
 
-`T001` — establish the Feature 002 workspace/package references and dependency boundary. The next
-bounded implementation session may complete Foundation plus US1 `T001–T035`, must preserve
-contract-first RED evidence, and must stop with `T036` as the first incomplete task.
+`T001` — record a clean Feature 001 contract, acceptance, recovery, and security baseline bound to the
+starting revision. The next bounded implementation session may complete Foundation plus US1
+`T001–T035`, must preserve contract-first RED evidence, and must stop with `T036` as the first
+incomplete task.
 
 ## Principal planning files
 
