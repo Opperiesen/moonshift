@@ -1,4 +1,5 @@
-import { execFile, spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import { X509Certificate } from 'node:crypto';
 import {
   chmod,
   copyFile,
@@ -13,7 +14,6 @@ import {
 import { connect as connectPlain } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
 import { connect as connectTls, type TLSSocket } from 'node:tls';
 import * as fileSystem from 'node:fs';
 
@@ -32,8 +32,13 @@ import {
   hasExclusiveRunnerIdentity,
   readOwnedTlsMaterial,
 } from '../../apps/runner/src/index.js';
+import {
+  createFixtureCertificateAuthority,
+  createFixtureLeafCertificate,
+  FIXTURE_CERTIFICATE_NOT_AFTER,
+  FIXTURE_CERTIFICATE_NOT_BEFORE,
+} from '../../packages/test-fixtures/src/index.js';
 
-const execFileAsync = promisify(execFile);
 const uuid = (suffix: number): string =>
   `30000000-0000-4000-8000-${String(suffix).padStart(12, '0')}`;
 const now = new Date('2026-08-30T12:00:00.000Z');
@@ -66,83 +71,20 @@ type Certificates = {
   rogueClientKey: Buffer;
 };
 
-async function openssl(args: readonly string[], cwd: string): Promise<void> {
-  await execFileAsync('openssl', args, { cwd });
-}
-
 async function createCertificates(): Promise<Certificates> {
   const root = await mkdtemp(join(tmpdir(), 'moonshift-runner-certs-'));
-  const validity = ['-not_before', '20260101000000Z', '-not_after', '20301231235959Z'];
   const ca = async (prefix: string, subject: string, serial: string) => {
-    await openssl(
-      [
-        'req',
-        '-x509',
-        '-newkey',
-        'rsa:2048',
-        '-noenc',
-        '-sha256',
-        '-batch',
-        '-subj',
-        subject,
-        '-set_serial',
-        serial,
-        ...validity,
-        '-addext',
-        'basicConstraints=critical,CA:TRUE,pathlen:1',
-        '-addext',
-        'keyUsage=critical,keyCertSign,cRLSign',
-        '-keyout',
-        `${prefix}.key`,
-        '-out',
-        `${prefix}.crt`,
-      ],
-      root,
-    );
+    await createFixtureCertificateAuthority({ directory: root, prefix, subject, serial });
   };
   const leaf = async (prefix: string, caPrefix: string, serial: string, extensions: string) => {
-    await writeFile(join(root, `${prefix}.ext`), `[leaf]\n${extensions}\n`, { mode: 0o600 });
-    await openssl(
-      [
-        'req',
-        '-new',
-        '-newkey',
-        'rsa:2048',
-        '-noenc',
-        '-sha256',
-        '-batch',
-        '-subj',
-        `/CN=${prefix}`,
-        '-keyout',
-        `${prefix}.key`,
-        '-out',
-        `${prefix}.csr`,
-      ],
-      root,
-    );
-    await openssl(
-      [
-        'x509',
-        '-req',
-        '-in',
-        `${prefix}.csr`,
-        '-CA',
-        `${caPrefix}.crt`,
-        '-CAkey',
-        `${caPrefix}.key`,
-        '-set_serial',
-        serial,
-        ...validity,
-        '-sha256',
-        '-extfile',
-        `${prefix}.ext`,
-        '-extensions',
-        'leaf',
-        '-out',
-        `${prefix}.crt`,
-      ],
-      root,
-    );
+    await createFixtureLeafCertificate({
+      directory: root,
+      prefix,
+      certificateAuthorityPrefix: caPrefix,
+      subject: `/CN=${prefix}`,
+      serial,
+      extensions,
+    });
   };
 
   await ca('ca', '/CN=Moonshift Test CA', '0x1000');
@@ -209,6 +151,12 @@ async function createCertificates(): Promise<Certificates> {
     rogueClientCert: await readFile(join(root, 'rogue-client.crt')),
     rogueClientKey: await readFile(join(root, 'rogue-client.key')),
   };
+}
+
+function expectDeterministicCertificateValidity(certificate: Buffer): void {
+  const parsed = new X509Certificate(certificate);
+  expect(parsed.validFromDate.toISOString()).toBe(FIXTURE_CERTIFICATE_NOT_BEFORE);
+  expect(parsed.validToDate.toISOString()).toBe(FIXTURE_CERTIFICATE_NOT_AFTER);
 }
 
 function base(messageId: string) {
@@ -409,6 +357,8 @@ describe.sequential('fixture runner authenticated boundary', () => {
 
   beforeAll(async () => {
     certificates = await createCertificates();
+    expectDeterministicCertificateValidity(certificates.ca);
+    expectDeterministicCertificateValidity(certificates.serverCert);
     runner = new FixtureRunnerServer({
       instanceId,
       runnerId,

@@ -1,10 +1,9 @@
-import { execFile } from 'node:child_process';
+import { X509Certificate } from 'node:crypto';
 import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:net';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
 
 import EmbeddedPostgres from 'embedded-postgres';
 import { Pool } from 'pg';
@@ -24,7 +23,13 @@ import {
   FixtureRunnerServer,
 } from '../../apps/runner/src/index.js';
 import { runMigrations } from '../../packages/persistence/src/index.js';
-import { createDeterministicUuid } from '../../packages/test-fixtures/src/index.js';
+import {
+  createDeterministicUuid,
+  createFixtureCertificateAuthority,
+  createFixtureLeafCertificate,
+  FIXTURE_CERTIFICATE_NOT_AFTER,
+  FIXTURE_CERTIFICATE_NOT_BEFORE,
+} from '../../packages/test-fixtures/src/index.js';
 
 async function unusedLoopbackPort(): Promise<number> {
   const server = createServer();
@@ -40,7 +45,6 @@ async function unusedLoopbackPort(): Promise<number> {
   return address.port;
 }
 
-const execFileAsync = promisify(execFile);
 const runnerInstanceId = '63000000-0000-4000-8000-000000000001';
 const runnerId = '63000000-0000-4000-8000-000000000002';
 const runnerClientSerial = '6301';
@@ -61,89 +65,27 @@ type RunnerCertificates = {
   readonly clientKey: Buffer;
 };
 
-async function openssl(args: readonly string[], cwd: string): Promise<void> {
-  await execFileAsync('openssl', args, { cwd });
-}
-
 async function createRunnerCertificates(root: string): Promise<RunnerCertificates> {
-  const validity = ['-not_before', '20260101000000Z', '-not_after', '20301231235959Z'];
-  await openssl(
-    [
-      'req',
-      '-x509',
-      '-newkey',
-      'rsa:2048',
-      '-noenc',
-      '-sha256',
-      '-batch',
-      '-subj',
-      '/CN=Moonshift US2 Fixture CA',
-      '-set_serial',
-      '0x6300',
-      ...validity,
-      '-addext',
-      'basicConstraints=critical,CA:TRUE,pathlen:1',
-      '-addext',
-      'keyUsage=critical,keyCertSign,cRLSign',
-      '-keyout',
-      'ca.key',
-      '-out',
-      'ca.crt',
-    ],
-    root,
-  );
+  await createFixtureCertificateAuthority({
+    directory: root,
+    prefix: 'ca',
+    subject: '/CN=Moonshift US2 Fixture CA',
+    serial: '0x6300',
+  });
   const leaf = async (
     prefix: string,
     serial: string,
     extendedKeyUsage: 'serverAuth' | 'clientAuth',
     subjectAlternativeName: string,
   ) => {
-    await writeFile(
-      join(root, `${prefix}.ext`),
-      `[leaf]\nbasicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=${extendedKeyUsage}\nsubjectAltName=${subjectAlternativeName}\n`,
-      { mode: 0o600 },
-    );
-    await openssl(
-      [
-        'req',
-        '-new',
-        '-newkey',
-        'rsa:2048',
-        '-noenc',
-        '-sha256',
-        '-batch',
-        '-subj',
-        `/CN=${prefix}`,
-        '-keyout',
-        `${prefix}.key`,
-        '-out',
-        `${prefix}.csr`,
-      ],
-      root,
-    );
-    await openssl(
-      [
-        'x509',
-        '-req',
-        '-in',
-        `${prefix}.csr`,
-        '-CA',
-        'ca.crt',
-        '-CAkey',
-        'ca.key',
-        '-set_serial',
-        serial,
-        ...validity,
-        '-sha256',
-        '-extfile',
-        `${prefix}.ext`,
-        '-extensions',
-        'leaf',
-        '-out',
-        `${prefix}.crt`,
-      ],
-      root,
-    );
+    await createFixtureLeafCertificate({
+      directory: root,
+      prefix,
+      certificateAuthorityPrefix: 'ca',
+      subject: `/CN=${prefix}`,
+      serial,
+      extensions: `basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=${extendedKeyUsage}\nsubjectAltName=${subjectAlternativeName}`,
+    });
   };
   await leaf('server', '0x6302', 'serverAuth', `IP:127.0.0.1,URI:urn:moonshift:runner:${runnerId}`);
   await leaf(
@@ -159,6 +101,12 @@ async function createRunnerCertificates(root: string): Promise<RunnerCertificate
     clientCert: await readFile(join(root, 'client.crt')),
     clientKey: await readFile(join(root, 'client.key')),
   };
+}
+
+function expectDeterministicCertificateValidity(certificate: Buffer): void {
+  const parsed = new X509Certificate(certificate);
+  expect(parsed.validFromDate.toISOString()).toBe(FIXTURE_CERTIFICATE_NOT_BEFORE);
+  expect(parsed.validToDate.toISOString()).toBe(FIXTURE_CERTIFICATE_NOT_AFTER);
 }
 
 describe.sequential('PostgreSQL supervised sensitive-work journey', () => {
@@ -178,6 +126,8 @@ describe.sequential('PostgreSQL supervised sensitive-work journey', () => {
     dataDirectory = await mkdtemp(join(tmpdir(), 'moonshift-us2-postgres-'));
     runnerDirectory = await mkdtemp(join(tmpdir(), 'moonshift-us2-runner-'));
     certificates = await createRunnerCertificates(runnerDirectory);
+    expectDeterministicCertificateValidity(certificates.ca);
+    expectDeterministicCertificateValidity(certificates.serverCert);
     const port = await unusedLoopbackPort();
     const user = 'moonshift_us2';
     const databasePassword = ['fixture', 'postgres', 'us2'].join('-');
