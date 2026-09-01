@@ -78,6 +78,13 @@ export type FixtureRestoreMetrics = {
   readonly schedulingDowntimeMs: number;
 };
 
+export type FixtureProjectionRebuildProof = {
+  readonly schemaVersion: typeof BACKUP_SCHEMA_VERSION;
+  readonly projection: 'project-events';
+  readonly validatedProjectIds: readonly string[];
+  readonly blockedProjectIds: readonly string[];
+};
+
 export type ValidatedFixtureBackup = {
   readonly manifest: FixtureBackupManifest;
   readonly database: DatabaseSnapshot;
@@ -568,6 +575,84 @@ async function stageRestoredArtifacts(
   }
 }
 
+function assertProjectionRebuildProof(
+  value: unknown,
+): asserts value is FixtureProjectionRebuildProof {
+  if (
+    !isRecord(value) ||
+    value.schemaVersion !== BACKUP_SCHEMA_VERSION ||
+    value.projection !== 'project-events' ||
+    !Array.isArray(value.validatedProjectIds) ||
+    !Array.isArray(value.blockedProjectIds) ||
+    !value.validatedProjectIds.every((projectId) => typeof projectId === 'string') ||
+    !value.blockedProjectIds.every((projectId) => typeof projectId === 'string')
+  ) {
+    throw new Error('Projection rebuild did not return a valid verification proof');
+  }
+  if (new Set(value.validatedProjectIds).size !== value.validatedProjectIds.length) {
+    throw new Error('Projection rebuild proof contains duplicate project identities');
+  }
+  if (value.blockedProjectIds.length > 0) {
+    throw new Error('Projection rebuild proof contains blocked projects');
+  }
+}
+
+async function assertRestoredProjectEventProjection(
+  pool: Pool,
+  proof: FixtureProjectionRebuildProof,
+): Promise<void> {
+  const state = await pool.query<{
+    project_id: string;
+    expected_last_sequence: string | null;
+    checkpoint_last_sequence: string | null;
+  }>(
+    `SELECT snapshots.project_id::text,
+            snapshots.record -> 'view' ->> 'lastSequence' AS expected_last_sequence,
+            checkpoints.last_sequence::text AS checkpoint_last_sequence
+     FROM project_snapshots snapshots
+     LEFT JOIN projection_checkpoints checkpoints
+       ON checkpoints.projection_name = 'project-events'
+      AND checkpoints.project_id = snapshots.project_id
+     ORDER BY snapshots.project_id`,
+  );
+  const expectedProjectIds = state.rows.map(({ project_id }) => project_id);
+  const validatedProjectIds = [...proof.validatedProjectIds].sort((left, right) =>
+    left.localeCompare(right),
+  );
+  if (JSON.stringify(validatedProjectIds) !== JSON.stringify(expectedProjectIds)) {
+    throw new Error('Projection rebuild proof does not cover every restored project');
+  }
+  for (const row of state.rows) {
+    if (
+      row.expected_last_sequence === null ||
+      row.checkpoint_last_sequence === null ||
+      row.checkpoint_last_sequence !== row.expected_last_sequence
+    ) {
+      throw new Error(`Project-event projection checkpoint is incomplete for ${row.project_id}`);
+    }
+  }
+  const checkpoints = await pool.query<{ project_id: string }>(
+    `SELECT project_id::text
+     FROM projection_checkpoints
+     WHERE projection_name = 'project-events'
+     ORDER BY project_id`,
+  );
+  if (
+    JSON.stringify(checkpoints.rows.map(({ project_id }) => project_id)) !==
+    JSON.stringify(expectedProjectIds)
+  ) {
+    throw new Error('Project-event projection checkpoints do not match restored projects');
+  }
+  const pending = await pool.query<{ count: string }>(
+    `SELECT count(*)::text AS count
+     FROM outbox_events
+     WHERE status <> 'PUBLISHED'`,
+  );
+  if (pending.rows[0]?.count !== '0') {
+    throw new Error('Projection rebuild left unpublished durable events');
+  }
+}
+
 export async function restoreFixtureBackup(input: {
   readonly pool: Pool;
   readonly backupDirectory: string;
@@ -575,14 +660,18 @@ export async function restoreFixtureBackup(input: {
   readonly schedulerStopped: boolean;
   readonly expectedConfigurationReferences: Readonly<Record<string, string>>;
   readonly expectedContractHashes: Readonly<Record<string, `sha256:${string}`>>;
-  readonly validateRestoredState: () => Promise<void>;
+  readonly rebuildAndValidateProjections: () => Promise<FixtureProjectionRebuildProof>;
   readonly monotonicNow?: () => number;
 }): Promise<{
   readonly schedulingMayResume: true;
   readonly manifest: FixtureBackupManifest;
+  readonly projectionRebuildProof: FixtureProjectionRebuildProof;
   readonly metrics: FixtureRestoreMetrics;
 }> {
   if (!input.schedulerStopped) throw new Error('Restore requires a stopped scheduler');
+  if (typeof input.rebuildAndValidateProjections !== 'function') {
+    throw new Error('Restore requires projection reconstruction and validation');
+  }
   const startedAt = input.monotonicNow?.() ?? performance.now();
   const validated = await validateFixtureBackup({
     backupDirectory: input.backupDirectory,
@@ -628,11 +717,18 @@ export async function restoreFixtureBackup(input: {
       client.release();
     }
     await rename(stageDirectory, input.artifactRoot);
-    await input.validateRestoredState();
+    const projectionRebuildProof = await input.rebuildAndValidateProjections();
+    assertProjectionRebuildProof(projectionRebuildProof);
+    await assertRestoredProjectEventProjection(input.pool, projectionRebuildProof);
     const finishedAt = input.monotonicNow?.() ?? performance.now();
     return Object.freeze({
       schedulingMayResume: true,
       manifest: validated.manifest,
+      projectionRebuildProof: Object.freeze({
+        ...projectionRebuildProof,
+        validatedProjectIds: Object.freeze([...projectionRebuildProof.validatedProjectIds]),
+        blockedProjectIds: Object.freeze([...projectionRebuildProof.blockedProjectIds]),
+      }),
       metrics: Object.freeze({
         restoredBytes: validated.metrics.databaseBytes + validated.metrics.artifactBytes,
         temporaryDiskBytesHighWater: validated.metrics.artifactBytes,

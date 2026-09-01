@@ -28,6 +28,12 @@ verify artifact ownership and hashes, and rebuild durable projections before sch
 resume. Any missing, changed, unknown, or unverifiable item fails closed and leaves scheduling
 stopped for supervisor attention. Restore must not silently retry effects or fabricate audit history.
 
+The restore API requires its reconstruction callback to return a structured project-event proof. The
+restore orchestrator then independently compares that proof with every restored project snapshot,
+requires an exact project-event checkpoint at each snapshot's final sequence, and requires no
+unpublished outbox event. An absent callback, a no-op callback, a blocked project, an incomplete
+checkpoint, or a reconstruction failure cannot produce `schedulingMayResume: true`.
+
 Migrations are forward-only. Before applying a migration, take a backup of the pre-upgrade set. A
 rollback for an unsupported downgrade is restoration of that pre-upgrade set; automatic down-migration
 is not promised.

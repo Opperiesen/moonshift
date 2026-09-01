@@ -310,6 +310,7 @@ describe('runtime and control-plane restart recovery', () => {
       replayedOutboxEvents: 1,
       publishedOutboxEvents: 1,
       projectionCheckpointsAdvanced: 1,
+      projectionValidatedProjectIds: [projectId],
       projectionReplayBlockedProjectIds: [],
       projectionReplayFailures: [],
     });

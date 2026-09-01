@@ -22,11 +22,13 @@ export interface FixtureSchedulerOptions {
   readonly activeSpecialists?: number;
   readonly activeCognitiveRuns?: number;
   readonly activeRunnerJobs?: number;
+  readonly specialistLimit?: number;
   readonly cognitiveRunLimit?: number;
 }
 
 export class FixtureScheduler {
   readonly expectedRevision: string;
+  readonly specialistLimit: number;
   readonly cognitiveRunLimit: number;
   private capacity: {
     activeSpecialists: number;
@@ -36,6 +38,15 @@ export class FixtureScheduler {
 
   constructor(private readonly options: FixtureSchedulerOptions) {
     this.expectedRevision = options.expectedRevision;
+    this.specialistLimit =
+      options.specialistLimit ?? DEFAULT_POLICY_PROFILE.specialists.defaultProjectMaximum;
+    if (
+      !Number.isSafeInteger(this.specialistLimit) ||
+      this.specialistLimit < 1 ||
+      this.specialistLimit > DEFAULT_POLICY_PROFILE.specialists.projectMaximum
+    ) {
+      throw new RangeError('Fixture specialist limit is outside the constitutional ceiling');
+    }
     this.cognitiveRunLimit =
       options.cognitiveRunLimit ?? DEFAULT_POLICY_PROFILE.cognitiveConcurrency.default;
     if (
@@ -78,7 +89,7 @@ export class FixtureScheduler {
 
   assertSpecialistCapacity(activeSpecialists = 0): void {
     const requestedSpecialists = activeSpecialists + this.activeSpecialists + 1;
-    if (requestedSpecialists > DEFAULT_POLICY_PROFILE.specialists.defaultProjectMaximum)
+    if (requestedSpecialists > this.specialistLimit)
       throw new ControlPlaneError(
         'SPECIALIST_CEILING',
         'Project specialist capacity is exhausted',

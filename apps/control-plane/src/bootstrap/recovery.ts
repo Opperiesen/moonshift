@@ -39,6 +39,7 @@ export interface DeliveryRecoveryReport {
   readonly replayedOutboxEvents: number;
   readonly publishedOutboxEvents: number;
   readonly projectionCheckpointsAdvanced: number;
+  readonly projectionValidatedProjectIds: readonly string[];
   readonly projectionReplayBlockedProjectIds: readonly string[];
   readonly projectionReplayFailures: readonly {
     readonly projectId: string;
@@ -76,6 +77,7 @@ export async function recoverPostgresDeliveryState(pool: Pool): Promise<Delivery
   let replayedOutboxEvents = 0;
   let publishedOutboxEvents = 0;
   let projectionCheckpointsAdvanced = 0;
+  const projectionValidatedProjectIds: string[] = [];
   const projectionReplayBlockedProjectIds: string[] = [];
   const projectionReplayFailures: { projectId: string; reason: string }[] = [];
   const blockProjection = (projectId: string, reason: string): void => {
@@ -199,6 +201,7 @@ export async function recoverPostgresDeliveryState(pool: Pool): Promise<Delivery
       });
       publishedOutboxEvents += delivery.deliveredEvents;
       projectionCheckpointsAdvanced += delivery.projectionEventsApplied;
+      projectionValidatedProjectIds.push(snapshot.project_id);
     } catch (error) {
       blockProjection(
         snapshot.project_id,
@@ -213,6 +216,7 @@ export async function recoverPostgresDeliveryState(pool: Pool): Promise<Delivery
     replayedOutboxEvents,
     publishedOutboxEvents,
     projectionCheckpointsAdvanced,
+    projectionValidatedProjectIds: Object.freeze(projectionValidatedProjectIds),
     projectionReplayBlockedProjectIds: Object.freeze(projectionReplayBlockedProjectIds),
     projectionReplayFailures: Object.freeze(
       projectionReplayFailures.map((failure) => Object.freeze(failure)),

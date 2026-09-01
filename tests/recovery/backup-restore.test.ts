@@ -247,7 +247,12 @@ describe.sequential('PostgreSQL fixture backup and restore', () => {
         schedulerStopped: true,
         expectedConfigurationReferences: configurationReferences,
         expectedContractHashes: contractHashes,
-        validateRestoredState: async () => undefined,
+        rebuildAndValidateProjections: async () => ({
+          schemaVersion: '1.0',
+          projection: 'project-events',
+          validatedProjectIds: [],
+          blockedProjectIds: [],
+        }),
       }),
     ).rejects.toThrow('Restore target table projection_checkpoints is not empty');
     await target.query('DELETE FROM projection_checkpoints');
@@ -262,7 +267,7 @@ describe.sequential('PostgreSQL fixture backup and restore', () => {
         let value = 1_000;
         return () => (value += 25);
       })(),
-      validateRestoredState: async () => {
+      rebuildAndValidateProjections: async () => {
         const report = await recoverPostgresDeliveryState(target);
         expect(report.projectionReplayBlockedProjectIds).toEqual([]);
         expect(report.projectionCheckpointsAdvanced).toBeGreaterThan(0);
@@ -271,9 +276,16 @@ describe.sequential('PostgreSQL fixture backup and restore', () => {
         );
         expect(restoredProject?.view).toEqual(submitted.view);
         expect(restoredProject?.organization).toEqual(submitted.organization);
+        return {
+          schemaVersion: '1.0',
+          projection: 'project-events',
+          validatedProjectIds: report.projectionValidatedProjectIds,
+          blockedProjectIds: report.projectionReplayBlockedProjectIds,
+        };
       },
     });
     expect(restored.schedulingMayResume).toBe(true);
+    expect(restored.projectionRebuildProof.validatedProjectIds).toEqual([submitted.view.projectId]);
     expect(restored.metrics.restoredBytes).toBeGreaterThan(0);
     expect(restored.metrics.temporaryDiskBytesHighWater).toBeGreaterThan(0);
     expect(restored.metrics.schedulingDowntimeMs).toBe(25);
@@ -292,6 +304,80 @@ describe.sequential('PostgreSQL fixture backup and restore', () => {
       ),
     ).resolves.toEqual(Buffer.from('{"fixture":true}\n'));
     await target.end();
+  });
+
+  it('keeps scheduling stopped when projection reconstruction is absent, a no-op, or fails', async () => {
+    const { submitted } = await seedProjectAndArtifact();
+    const backupDirectory = join(workspaceDirectory, 'backup-unverified-rebuild');
+    await createFixtureBackup({
+      pool: source,
+      artifactRoot: sourceArtifacts,
+      outputDirectory: backupDirectory,
+      configurationReferences,
+      contractHashes,
+    });
+
+    const missing = await createTargetPool('moonshift_backup_missing_rebuild');
+    await expect(
+      restoreFixtureBackup({
+        pool: missing,
+        backupDirectory,
+        artifactRoot: join(workspaceDirectory, 'missing-rebuild-target'),
+        schedulerStopped: true,
+        expectedConfigurationReferences: configurationReferences,
+        expectedContractHashes: contractHashes,
+        rebuildAndValidateProjections: undefined as never,
+      }),
+    ).rejects.toThrow('Restore requires projection reconstruction and validation');
+    await expect(
+      missing.query('SELECT count(*)::integer AS count FROM project_snapshots'),
+    ).resolves.toMatchObject({ rows: [{ count: 0 }] });
+    await missing.end();
+
+    const noOp = await createTargetPool('moonshift_backup_noop_rebuild');
+    await expect(
+      restoreFixtureBackup({
+        pool: noOp,
+        backupDirectory,
+        artifactRoot: join(workspaceDirectory, 'noop-rebuild-target'),
+        schedulerStopped: true,
+        expectedConfigurationReferences: configurationReferences,
+        expectedContractHashes: contractHashes,
+        rebuildAndValidateProjections: async () => ({
+          schemaVersion: '1.0',
+          projection: 'project-events',
+          validatedProjectIds: [submitted.view.projectId],
+          blockedProjectIds: [],
+        }),
+      }),
+    ).rejects.toThrow(
+      `Project-event projection checkpoint is incomplete for ${submitted.view.projectId}`,
+    );
+    await expect(
+      noOp.query(
+        "SELECT count(*)::integer AS count FROM outbox_events WHERE status <> 'PUBLISHED'",
+      ),
+    ).resolves.toMatchObject({ rows: [{ count: submitted.view.lastSequence }] });
+    await noOp.end();
+
+    const failed = await createTargetPool('moonshift_backup_failed_rebuild');
+    await expect(
+      restoreFixtureBackup({
+        pool: failed,
+        backupDirectory,
+        artifactRoot: join(workspaceDirectory, 'failed-rebuild-target'),
+        schedulerStopped: true,
+        expectedConfigurationReferences: configurationReferences,
+        expectedContractHashes: contractHashes,
+        rebuildAndValidateProjections: async () => {
+          throw new Error('fixture projection reconstruction failed');
+        },
+      }),
+    ).rejects.toThrow('fixture projection reconstruction failed');
+    await expect(
+      failed.query('SELECT count(*)::integer AS count FROM projection_checkpoints'),
+    ).resolves.toMatchObject({ rows: [{ count: 0 }] });
+    await failed.end();
   });
 
   it('validates tampering and scheduler state before any target database write', async () => {
@@ -319,7 +405,12 @@ describe.sequential('PostgreSQL fixture backup and restore', () => {
         schedulerStopped: true,
         expectedConfigurationReferences: configurationReferences,
         expectedContractHashes: contractHashes,
-        validateRestoredState: async () => undefined,
+        rebuildAndValidateProjections: async () => ({
+          schemaVersion: '1.0',
+          projection: 'project-events',
+          validatedProjectIds: [],
+          blockedProjectIds: [],
+        }),
       }),
     ).rejects.toThrow('Artifact backup failed integrity validation');
     await expect(
@@ -330,7 +421,12 @@ describe.sequential('PostgreSQL fixture backup and restore', () => {
         schedulerStopped: false,
         expectedConfigurationReferences: configurationReferences,
         expectedContractHashes: contractHashes,
-        validateRestoredState: async () => undefined,
+        rebuildAndValidateProjections: async () => ({
+          schemaVersion: '1.0',
+          projection: 'project-events',
+          validatedProjectIds: [],
+          blockedProjectIds: [],
+        }),
       }),
     ).rejects.toThrow('Restore requires a stopped scheduler');
     await expect(target.query('SELECT count(*)::text AS count FROM aggregates')).resolves.toEqual(

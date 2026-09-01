@@ -440,6 +440,8 @@ export function createPostgresControlPlane(input: {
   readonly version?: string;
   readonly effectExecutor: ApprovedEffectExecutor;
   readonly artifactRoot?: string;
+  readonly specialistLimit?: number;
+  readonly cognitiveRunLimit?: number;
   readonly recoveryScanIntervalMs?: number;
   readonly heartbeatTimeoutMs?: number;
   readonly recoveryBackendConnections?: ConstructorParameters<
@@ -474,6 +476,10 @@ export function createPostgresControlPlane(input: {
     now,
     nextId,
     expectedRevision: input.expectedRevision,
+    ...(input.specialistLimit === undefined ? {} : { specialistLimit: input.specialistLimit }),
+    ...(input.cognitiveRunLimit === undefined
+      ? {}
+      : { cognitiveRunLimit: input.cognitiveRunLimit }),
   });
   const service = new ProjectService({ repository, scheduler, nextId });
   const artifactRoot =
