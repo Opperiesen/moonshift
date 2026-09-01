@@ -34,8 +34,8 @@ From the repository root:
 ```bash
 corepack enable
 pnpm install --frozen-lockfile
-pnpm contracts:validate
 pnpm typecheck
+pnpm contracts:validate
 pnpm test:runner
 pnpm test:acceptance
 ```
