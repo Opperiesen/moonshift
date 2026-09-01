@@ -4,7 +4,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { chromium, type Browser } from '@playwright/test';
+import { chromium } from '@playwright/test';
 import EmbeddedPostgres from 'embedded-postgres';
 import { Pool } from 'pg';
 import { createServer as createViteServer, type ViteDevServer } from 'vite';
@@ -14,6 +14,7 @@ import {
   createPostgresControlPlane,
   InMemoryApprovedEffectExecutor,
   recoverPostgresDeliveryState,
+  recoverPostgresDeliveryStateWithMaintenance,
   type ProjectView,
 } from '../../apps/control-plane/src/index.js';
 import { FixtureScheduler } from '../../apps/control-plane/src/scheduler/index.js';
@@ -30,7 +31,9 @@ import {
   restoreFixtureBackup,
   runMigrations,
 } from '../../packages/persistence/src/index.js';
+import { DEFAULT_POLICY_PROFILE } from '../../packages/policy/src/index.js';
 import { createDeterministicUuid } from '../../packages/test-fixtures/src/index.js';
+import { materializeSingleProjectCognitiveLoad } from './fixtures/single-project-cognitive-load.js';
 
 async function unusedLoopbackPort(): Promise<number> {
   const server = createServer();
@@ -143,6 +146,7 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
 
     const eventLatencyByConcurrency: Record<string, readonly number[]> = {};
     const executionEventCountByConcurrency: Record<string, number> = {};
+    const queueReasonByConcurrency: Record<string, string> = {};
     const journeyMsByConcurrency: Record<string, number> = {};
     const journeyPostgresByConcurrency: Record<
       string,
@@ -158,6 +162,10 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
         const webPort = await unusedLoopbackPort();
         const origin = `http://127.0.0.1:${String(webPort)}`;
         const bootstrapSecret = String(concurrency).repeat(48);
+        const cognitiveRunLimit =
+          concurrency === profile.controlPlane.cognitiveRunsMaximum
+            ? profile.controlPlane.cognitiveRunsMaximum
+            : profile.controlPlane.cognitiveRunsDefault;
         const controlPlane = createPostgresControlPlane({
           pool,
           bootstrapSecret,
@@ -168,12 +176,13 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
           nextId: createDeterministicUuid(`capacity-journey-${String(concurrency)}`),
           effectExecutor: new InMemoryApprovedEffectExecutor(),
           artifactRoot: join(testRoot, `journey-${String(concurrency)}-artifacts`),
-          specialistLimit: concurrency,
-          cognitiveRunLimit: concurrency,
+          ...(concurrency === profile.controlPlane.cognitiveRunsMaximum
+            ? { cognitiveRunLimit }
+            : {}),
           recoveryScanIntervalMs: 60_000,
         });
         let vite: ViteDevServer | undefined;
-        const contexts: Awaited<ReturnType<Browser['newContext']>>[] = [];
+        const context = await browser.newContext();
         try {
           await controlPlane.server.listen({ host: '127.0.0.1', port: controlPlanePort });
           const bootstrap = await fetch(`${controlPlaneOrigin}/v1/session/bootstrap`, {
@@ -197,106 +206,98 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
             },
           });
           await vite.listen();
-          const pages = await Promise.all(
-            Array.from({ length: concurrency }, async (_, index) => {
-              const context = await browser.newContext();
-              contexts.push(context);
-              await context.addCookies([
-                {
-                  name: cookie.slice(0, cookieSeparator),
-                  value: cookie.slice(cookieSeparator + 1),
-                  url: origin,
-                },
-              ]);
-              const page = await context.newPage();
-              await page.goto(origin);
-              await page.getByRole('heading', { name: 'Projects' }).waitFor();
-              const objective = `Chromium PostgreSQL capacity ${String(concurrency)} project ${String(index + 1)}`;
-              await page.getByLabel('Software objective').fill(objective);
-              return { page, objective };
-            }),
-          );
+          await context.addCookies([
+            {
+              name: cookie.slice(0, cookieSeparator),
+              value: cookie.slice(cookieSeparator + 1),
+              url: origin,
+            },
+          ]);
+          const page = await context.newPage();
+          await page.goto(origin);
+          await page.getByRole('heading', { name: 'Projects' }).waitFor();
+          const objective = `Chromium PostgreSQL single-project capacity ${String(concurrency)}`;
+          await page.getByLabel('Software objective').fill(objective);
           const journeyStartedAt = performance.now();
-          await Promise.all(
-            pages.map(async ({ page }) => {
-              const projectResponse = page.waitForResponse(
-                (response) =>
-                  response.request().method() === 'POST' &&
-                  new URL(response.url()).pathname === '/v1/projects',
-              );
-              await page.getByRole('button', { name: 'Start project' }).click();
-              const response = await projectResponse;
-              const responseBody = await response.text();
-              expect(response.status(), responseBody).toBe(201);
-              await page.getByRole('heading', { name: 'Observe' }).waitFor();
+          const projectResponse = page.waitForResponse(
+            (response) =>
+              response.request().method() === 'POST' &&
+              new URL(response.url()).pathname === '/v1/projects',
+          );
+          await page.getByRole('button', { name: 'Start project' }).click();
+          const response = await projectResponse;
+          const responseBody = await response.text();
+          expect(response.status(), responseBody).toBe(201);
+          const submitted = JSON.parse(responseBody) as ProjectView;
+          await page.getByRole('heading', { name: 'Observe' }).waitFor();
+
+          const load = await materializeSingleProjectCognitiveLoad({
+            repository: controlPlane.repository,
+            scheduler: controlPlane.scheduler,
+            projectId: submitted.projectId,
+            targetConcurrency: concurrency,
+            nextId: createDeterministicUuid(`capacity-load-${String(concurrency)}`),
+          });
+          const records = await controlPlane.repository.list();
+          expect(records).toHaveLength(1);
+          const record = records[0];
+          if (record === undefined) throw new Error('Chromium journey project is missing');
+          expect(record.view.objective).toBe(objective);
+          expect(record.scheduling.execution.state).toBe('WAITING_FOR_APPROVAL');
+          expect(record.scheduling.queueReason).toBe('WAITING_FOR_APPROVAL');
+          expect(record.view.specialists).toHaveLength(1);
+          expect(controlPlane.scheduler.specialistLimit).toBe(
+            DEFAULT_POLICY_PROFILE.specialists.defaultProjectMaximum,
+          );
+          expect(controlPlane.scheduler.cognitiveRunLimit).toBe(cognitiveRunLimit);
+          expect(record.view.capacity.cognitiveRunLimit).toBe(cognitiveRunLimit);
+          expect(record.view.capacity.activeCognitiveRuns).toBe(concurrency);
+          expect(load.executionIds).toHaveLength(concurrency);
+          expect(new Set(load.executionIds).size).toBe(concurrency);
+          expect(load.backendEventIds).toHaveLength(concurrency * 4);
+          expect(load.queueProbe.reason).toBe('COGNITIVE_CAPACITY');
+          expect(load.executionIds).not.toContain(load.queueProbe.executionId);
+          const executionEvents = record.events.filter(
+            ({ aggregate, kind }) =>
+              kind === 'backend.event_observed' && load.executionIds.includes(aggregate.id),
+          );
+          expect(executionEvents).toHaveLength(concurrency * 4);
+          const latencies = await Promise.all(
+            record.events.map(async (event) => {
+              await page.locator(`[data-event-id="${event.eventId}"]`).waitFor({
+                state: 'visible',
+                timeout: 10_000,
+              });
+              return Math.max(0, Date.now() - Date.parse(event.occurredAt));
             }),
           );
-          const records = await controlPlane.repository.list();
-          expect(records).toHaveLength(concurrency);
-          const latencies = (
-            await Promise.all(
-              pages.map(async ({ page, objective }) => {
-                const record = records.find((candidate) => candidate.view.objective === objective);
-                if (record === undefined) throw new Error('Chromium journey project is missing');
-                expect(record.scheduling.execution.state).toBe('WAITING_FOR_APPROVAL');
-                expect(record.scheduling.queueReason).toBe('WAITING_FOR_APPROVAL');
-                expect(record.view.capacity.cognitiveRunLimit).toBe(concurrency);
-                const executionEvents = record.events.filter(
-                  ({ kind }) => kind === 'backend.event_observed',
-                );
-                expect(executionEvents).toHaveLength(4);
-                const displayed = await Promise.all(
-                  record.events.map(async (event) => {
-                    await page.locator(`[data-event-id="${event.eventId}"]`).waitFor({
-                      state: 'visible',
-                      timeout: 10_000,
-                    });
-                    return Math.max(0, Date.now() - Date.parse(event.occurredAt));
-                  }),
-                );
-                const activity = await page
-                  .getByRole('log', { name: 'Project activity' })
-                  .getByRole('listitem')
-                  .evaluateAll((items) =>
-                    items.map((item) => ({
-                      eventId: item.getAttribute('data-event-id'),
-                      sequence: Number(item.getAttribute('data-sequence')),
-                    })),
-                  );
-                expect(activity).toEqual(
-                  record.events.map((event) => ({
-                    eventId: event.eventId,
-                    sequence: event.sequence,
-                  })),
-                );
-                return displayed;
-              }),
-            )
-          ).flat();
+          const activity = await page
+            .getByRole('log', { name: 'Project activity' })
+            .getByRole('listitem')
+            .evaluateAll((items) =>
+              items.map((item) => ({
+                eventId: item.getAttribute('data-event-id'),
+                sequence: Number(item.getAttribute('data-sequence')),
+              })),
+            );
+          expect(activity).toEqual(
+            record.events.map((event) => ({
+              eventId: event.eventId,
+              sequence: event.sequence,
+            })),
+          );
           expect(latencies).not.toHaveLength(0);
           const postgres = await collectPostgresObservability(pool);
           expect(postgres.pendingOutboxEvents).toBe(0);
           expect(postgres.queuedExecutions).toBe(0);
-          expect(postgres.queueReasons).toEqual({ WAITING_FOR_APPROVAL: concurrency });
-          expect(controlPlane.scheduler.cognitiveRunLimit).toBe(concurrency);
-          expect(
-            records.filter(
-              ({ scheduling }) => scheduling.execution.state === 'WAITING_FOR_APPROVAL',
-            ),
-          ).toHaveLength(concurrency);
-          expect(Math.max(...records.map(({ view }) => view.capacity.activeCognitiveRuns))).toBe(
-            concurrency,
-          );
+          expect(postgres.queueReasons).toEqual({ WAITING_FOR_APPROVAL: 1 });
           eventLatencyByConcurrency[String(concurrency)] = Object.freeze(latencies);
-          executionEventCountByConcurrency[String(concurrency)] = records.reduce(
-            (count, record) =>
-              count + record.events.filter(({ kind }) => kind === 'backend.event_observed').length,
-            0,
-          );
+          executionEventCountByConcurrency[String(concurrency)] = executionEvents.length;
+          queueReasonByConcurrency[String(concurrency)] = load.queueProbe.reason;
           journeyMsByConcurrency[String(concurrency)] = performance.now() - journeyStartedAt;
           journeyPostgresByConcurrency[String(concurrency)] = postgres;
         } finally {
-          await Promise.all(contexts.map(async (context) => context.close()));
+          await context.close();
           await vite?.close();
           await controlPlane.server.close();
         }
@@ -337,7 +338,7 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
       const cookie = bootstrap.headers.get('set-cookie')?.split(';')[0];
       if (cookie === undefined) throw new Error('Expected capacity supervisor session cookie');
 
-      for (let index = 0; index < 4; index += 1) {
+      const submitProject = async (index: number): Promise<ProjectView> => {
         const started = performance.now();
         const response = await fetch(`${controlPlaneOrigin}/v1/projects`, {
           method: 'POST',
@@ -355,25 +356,10 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
         submissionLatencies.push(performance.now() - started);
         const responseBody = await response.text();
         expect(response.status, responseBody).toBe(201);
-        projects.push(JSON.parse(responseBody) as ProjectView);
-      }
-      const projectRecords = await Promise.all(
-        projects.map(({ projectId }) => controlPlane.repository.get(projectId)),
-      );
-      expect(
-        projectRecords
-          .slice(0, 3)
-          .every((record) => record?.scheduling.queueReason === 'WAITING_FOR_APPROVAL'),
-      ).toBe(true);
-      expect(projectRecords[3]?.scheduling.queueReason).toBe('COGNITIVE_CAPACITY');
-
-      postgres = await collectPostgresObservability(sourcePool);
-      expect(postgres.connections).toBeLessThanOrEqual(20);
-      expect(postgres.waitingLocks).toBe(0);
-      expect(postgres.pendingOutboxEvents).toBe(0);
-      expect(postgres.outboxLagMs).toBe(0);
-      expect(postgres.queuedExecutions).toBe(1);
-      expect(postgres.queueReasons).toMatchObject({ COGNITIVE_CAPACITY: 1 });
+        const project = JSON.parse(responseBody) as ProjectView;
+        projects.push(project);
+        return project;
+      };
 
       const measureHttpCommand = async (
         command: string,
@@ -388,8 +374,14 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
         expect(response.status, responseBody).toBe(expectedStatus);
         commandLatencies.push(Object.freeze({ command, milliseconds }));
       };
-      const firstProjectId = projects[0]?.projectId;
-      if (firstProjectId === undefined) throw new Error('Expected first capacity project');
+      const expectActiveProjectCount = async (expected: number): Promise<void> => {
+        expect(
+          (await controlPlane.repository.list()).filter(({ view }) => view.status === 'ACTIVE'),
+        ).toHaveLength(expected);
+      };
+      const firstProject = await submitProject(0);
+      await expectActiveProjectCount(1);
+      const firstProjectId = firstProject.projectId;
       let firstRecord = await controlPlane.repository.get(firstProjectId);
       if (firstRecord === null) throw new Error('Expected first capacity project record');
       await measureHttpCommand(
@@ -428,6 +420,32 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
       );
       firstRecord = await controlPlane.repository.get(firstProjectId);
       if (firstRecord === null) throw new Error('Expected resumed capacity project');
+      const firstApproval = firstRecord.supervision.approvals.find(
+        ({ state }) => state === 'REQUESTED',
+      );
+      if (firstApproval === undefined) throw new Error('Expected first capacity approval');
+      await measureHttpCommand(
+        'APPROVE',
+        `/v1/projects/${firstProjectId}/approvals/${firstApproval.approvalId}/decision`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            cookie,
+            'idempotency-key': 'capacity-command-approve',
+            'x-correlation-id': '78000000-0000-4000-8040-000000000003',
+            'if-match': `"${String(firstApproval.version)}"`,
+          },
+          body: JSON.stringify({
+            decision: 'APPROVE',
+            actionDigest: firstApproval.actionDigest,
+            reason: 'Measure durable fixture approve acknowledgement',
+          }),
+        },
+        200,
+      );
+      firstRecord = await controlPlane.repository.get(firstProjectId);
+      if (firstRecord === null) throw new Error('Expected approved capacity project');
       await measureHttpCommand(
         'STOP',
         `/v1/projects/${firstProjectId}/commands/stop`,
@@ -437,55 +455,53 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
             'content-type': 'application/json',
             cookie,
             'idempotency-key': 'capacity-command-stop',
-            'x-correlation-id': '78000000-0000-4000-8040-000000000003',
+            'x-correlation-id': '78000000-0000-4000-8040-000000000004',
             'if-match': `"${String(firstRecord.view.version)}"`,
           },
           body: JSON.stringify({ reason: 'Measure durable fixture stop acknowledgement' }),
         },
         202,
       );
+      expect((await controlPlane.repository.get(firstProjectId))?.view.status).toBe('STOPPED');
+      await expectActiveProjectCount(0);
 
-      for (const [projectIndex, decision] of [
-        [1, 'APPROVE'],
-        [2, 'REJECT'],
-      ] as const) {
-        const projectId = projects[projectIndex]?.projectId;
-        if (projectId === undefined) throw new Error('Expected approval capacity project');
-        const record = await controlPlane.repository.get(projectId);
-        const approval = record?.supervision.approvals[0];
-        if (approval === undefined) throw new Error('Expected capacity approval');
-        await measureHttpCommand(
-          decision,
-          `/v1/projects/${projectId}/approvals/${approval.approvalId}/decision`,
-          {
-            method: 'POST',
-            headers: {
-              'content-type': 'application/json',
-              cookie,
-              'idempotency-key': `capacity-command-${decision.toLocaleLowerCase('en-US')}`,
-              'x-correlation-id':
-                decision === 'APPROVE'
-                  ? '78000000-0000-4000-8040-000000000004'
-                  : '78000000-0000-4000-8040-000000000005',
-              'if-match': `"${String(approval.version)}"`,
-            },
-            body: JSON.stringify({
-              decision,
-              actionDigest: approval.actionDigest,
-              reason: `Measure durable fixture ${decision.toLocaleLowerCase('en-US')} acknowledgement`,
-            }),
+      const secondProject = await submitProject(1);
+      await expectActiveProjectCount(1);
+      const secondRecord = await controlPlane.repository.get(secondProject.projectId);
+      const secondApproval = secondRecord?.supervision.approvals[0];
+      if (secondApproval === undefined) throw new Error('Expected second capacity approval');
+      await measureHttpCommand(
+        'REJECT',
+        `/v1/projects/${secondProject.projectId}/approvals/${secondApproval.approvalId}/decision`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            cookie,
+            'idempotency-key': 'capacity-command-reject',
+            'x-correlation-id': '78000000-0000-4000-8040-000000000005',
+            'if-match': `"${String(secondApproval.version)}"`,
           },
-          200,
-        );
-      }
+          body: JSON.stringify({
+            decision: 'REJECT',
+            actionDigest: secondApproval.actionDigest,
+            reason: 'Measure durable fixture reject acknowledgement',
+          }),
+        },
+        200,
+      );
+      expect((await controlPlane.repository.get(secondProject.projectId))?.view.status).toBe(
+        'BLOCKED',
+      );
+      await expectActiveProjectCount(0);
 
-      const fourthProjectId = projects[3]?.projectId;
-      if (fourthProjectId === undefined) throw new Error('Expected queued capacity project');
-      const fourthRecord = await controlPlane.repository.get(fourthProjectId);
-      if (fourthRecord === null) throw new Error('Expected queued capacity project record');
+      const thirdProject = await submitProject(2);
+      await expectActiveProjectCount(1);
+      const thirdRecord = await controlPlane.repository.get(thirdProject.projectId);
+      if (thirdRecord === null) throw new Error('Expected third capacity project record');
       await measureHttpCommand(
         'CANCEL',
-        `/v1/projects/${fourthProjectId}/commands/cancel`,
+        `/v1/projects/${thirdProject.projectId}/commands/cancel`,
         {
           method: 'POST',
           headers: {
@@ -493,12 +509,24 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
             cookie,
             'idempotency-key': 'capacity-command-cancel',
             'x-correlation-id': '78000000-0000-4000-8040-000000000006',
-            'if-match': `"${String(fourthRecord.view.version)}"`,
+            'if-match': `"${String(thirdRecord.view.version)}"`,
           },
           body: JSON.stringify({ reason: 'Measure durable fixture cancel acknowledgement' }),
         },
         202,
       );
+      expect((await controlPlane.repository.get(thirdProject.projectId))?.view.status).toBe(
+        'CANCELLED',
+      );
+      await expectActiveProjectCount(0);
+
+      postgres = await collectPostgresObservability(sourcePool);
+      expect(postgres.connections).toBeLessThanOrEqual(20);
+      expect(postgres.waitingLocks).toBe(0);
+      expect(postgres.pendingOutboxEvents).toBe(0);
+      expect(postgres.outboxLagMs).toBe(0);
+      expect(postgres.queuedExecutions).toBe(0);
+      expect(postgres.queueReasons).toEqual({ WAITING_FOR_APPROVAL: 2 });
     } finally {
       await controlPlane.server.close();
     }
@@ -514,8 +542,8 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
     expect(commandLatencies.map(({ command }) => command)).toEqual([
       'PAUSE',
       'RESUME',
-      'STOP',
       'APPROVE',
+      'STOP',
       'REJECT',
       'CANCEL',
     ]);
@@ -525,8 +553,8 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
     expect(postgres.waitingLocks).toBe(0);
     expect(postgres.pendingOutboxEvents).toBe(0);
     expect(postgres.outboxLagMs).toBe(0);
-    expect(postgres.queuedExecutions).toBe(1);
-    expect(postgres.queueReasons).toMatchObject({ COGNITIVE_CAPACITY: 1 });
+    expect(postgres.queuedExecutions).toBe(0);
+    expect(postgres.queueReasons).toEqual({ WAITING_FOR_APPROVAL: 2 });
 
     const processResources = collectProcessResourceSnapshot();
     expect(processResources.rssBytes).toBeLessThan(profile.controlPlane.memoryEnvelopeBytes);
@@ -629,11 +657,13 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
       pool: restorePool,
       backupDirectory,
       artifactRoot: restoredArtifactRoot,
-      schedulerStopped: true,
       expectedConfigurationReferences: configurationReferences,
       expectedContractHashes: contractHashes,
-      rebuildAndValidateProjections: async () => {
-        const report = await recoverPostgresDeliveryState(restorePool);
+      rebuildAndValidateProjections: async (context) => {
+        const report = await recoverPostgresDeliveryStateWithMaintenance(
+          restorePool,
+          context.client,
+        );
         expect(report.projectionReplayBlockedProjectIds).toEqual([]);
         restoredStateValidated = true;
         return {
@@ -660,7 +690,7 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
     );
     expect(
       await restorePool.query('SELECT count(*)::integer AS count FROM project_snapshots'),
-    ).toMatchObject({ rows: [{ count: 4 }] });
+    ).toMatchObject({ rows: [{ count: 3 }] });
 
     const journeyOne = journeyPostgresByConcurrency['1'];
     const journeyThree = journeyPostgresByConcurrency['3'];
@@ -674,15 +704,19 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
       profile: 'foundation-16gb-pve-evaluation',
       measurement: {
         eventVisibility:
-          'Conservative upper bound from PostgreSQL-authored event time before commit through loopback SSE replay to the submitting Chromium DOM',
+          'Conservative upper bound from PostgreSQL-authored event time before commit through loopback SSE replay to one submitting Chromium DOM',
+        cognitiveLoad:
+          'One browser-submitted PostgreSQL project and its one bounded specialist; additional slots execute through FixtureScheduler and persist its exact sanitized fake-backend observations through the project repository/outbox',
         commandDurability:
           'Loopback HTTP request to response after PostgreSQL transaction and outbox drain',
       },
       concurrency: {
         one: {
           cognitiveExecutions: 1,
-          configuredSpecialistLimit: 1,
-          configuredCognitiveRunLimit: 1,
+          activeProjects: 1,
+          activeSpecialists: 1,
+          configuredSpecialistLimit: DEFAULT_POLICY_PROFILE.specialists.defaultProjectMaximum,
+          configuredCognitiveRunLimit: profile.controlPlane.cognitiveRunsDefault,
           journeyMs: journeyMsByConcurrency['1'],
           committedObservableEvents: eventLatencyByConcurrency['1']?.length ?? 0,
           executionProducedEvents: executionEventCountByConcurrency['1'],
@@ -692,8 +726,10 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
         },
         three: {
           cognitiveExecutions: 3,
-          configuredSpecialistLimit: 3,
-          configuredCognitiveRunLimit: 3,
+          activeProjects: 1,
+          activeSpecialists: 1,
+          configuredSpecialistLimit: DEFAULT_POLICY_PROFILE.specialists.defaultProjectMaximum,
+          configuredCognitiveRunLimit: profile.controlPlane.cognitiveRunsDefault,
           journeyMs: journeyMsByConcurrency['3'],
           committedObservableEvents: eventLatencyByConcurrency['3']?.length ?? 0,
           executionProducedEvents: executionEventCountByConcurrency['3'],
@@ -703,8 +739,10 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
         },
         five: {
           cognitiveExecutions: 5,
-          configuredSpecialistLimit: 5,
-          configuredCognitiveRunLimit: 5,
+          activeProjects: 1,
+          activeSpecialists: 1,
+          configuredSpecialistLimit: DEFAULT_POLICY_PROFILE.specialists.defaultProjectMaximum,
+          configuredCognitiveRunLimit: profile.controlPlane.cognitiveRunsMaximum,
           journeyMs: journeyMsByConcurrency['5'],
           committedObservableEvents: eventLatencyByConcurrency['5']?.length ?? 0,
           executionProducedEvents: executionEventCountByConcurrency['5'],
@@ -726,7 +764,8 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
       commandDurabilityP50Ms: commandP50,
       commandDurabilityP95Ms: commandP95,
       queue: {
-        reasons: postgres.queueReasons,
+        reasonsByConcurrency: queueReasonByConcurrency,
+        persistedProjectReasons: postgres.queueReasons,
         queuedExecutions: postgres.queuedExecutions,
         waitMs: postgres.queueWaitMs,
       },

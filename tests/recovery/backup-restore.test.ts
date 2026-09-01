@@ -2,13 +2,17 @@ import { createServer } from 'node:net';
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import EmbeddedPostgres from 'embedded-postgres';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { PostgresProjectRepository, ProjectService } from '../../apps/control-plane/src/index.js';
-import { recoverPostgresDeliveryState } from '../../apps/control-plane/src/bootstrap/recovery.js';
+import {
+  recoverPostgresDeliveryState,
+  recoverPostgresDeliveryStateWithMaintenance,
+} from '../../apps/control-plane/src/bootstrap/recovery.js';
 import { FixtureScheduler } from '../../apps/control-plane/src/scheduler/index.js';
 import { FsArtifactStore, type StoredArtifact } from '../../packages/artifacts/src/index.js';
 import {
@@ -173,6 +177,23 @@ describe.sequential('PostgreSQL fixture backup and restore', () => {
     return { submitted, stored };
   }
 
+  async function waitForBlockedMaintenanceOperation(pool: Pool): Promise<void> {
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+      const waiting = await pool.query<{ count: string }>(
+        `SELECT count(*)::text AS count
+         FROM pg_stat_activity
+         WHERE datname = current_database()
+           AND pid <> pg_backend_pid()
+           AND state = 'active'
+           AND wait_event_type = 'Lock'
+           AND query LIKE '%pg_advisory_xact_lock_shared%'`,
+      );
+      if (waiting.rows[0]?.count !== '0') return;
+      await delay(10);
+    }
+    throw new Error('Concurrent control-plane write did not wait on restore maintenance');
+  }
+
   it('runs clean migration and upgrades the immediately previous fixture schema immutably', async () => {
     const clean = await createTargetPool('moonshift_backup_clean');
     await expect(
@@ -244,7 +265,6 @@ describe.sequential('PostgreSQL fixture backup and restore', () => {
         pool: target,
         backupDirectory,
         artifactRoot: targetArtifacts,
-        schedulerStopped: true,
         expectedConfigurationReferences: configurationReferences,
         expectedContractHashes: contractHashes,
         rebuildAndValidateProjections: async () => ({
@@ -260,15 +280,14 @@ describe.sequential('PostgreSQL fixture backup and restore', () => {
       pool: target,
       backupDirectory,
       artifactRoot: targetArtifacts,
-      schedulerStopped: true,
       expectedConfigurationReferences: configurationReferences,
       expectedContractHashes: contractHashes,
       monotonicNow: (() => {
         let value = 1_000;
         return () => (value += 25);
       })(),
-      rebuildAndValidateProjections: async () => {
-        const report = await recoverPostgresDeliveryState(target);
+      rebuildAndValidateProjections: async (context) => {
+        const report = await recoverPostgresDeliveryStateWithMaintenance(target, context.client);
         expect(report.projectionReplayBlockedProjectIds).toEqual([]);
         expect(report.projectionCheckpointsAdvanced).toBeGreaterThan(0);
         const restoredProject = await new PostgresProjectRepository(target).get(
@@ -323,7 +342,6 @@ describe.sequential('PostgreSQL fixture backup and restore', () => {
         pool: missing,
         backupDirectory,
         artifactRoot: join(workspaceDirectory, 'missing-rebuild-target'),
-        schedulerStopped: true,
         expectedConfigurationReferences: configurationReferences,
         expectedContractHashes: contractHashes,
         rebuildAndValidateProjections: undefined as never,
@@ -340,7 +358,6 @@ describe.sequential('PostgreSQL fixture backup and restore', () => {
         pool: noOp,
         backupDirectory,
         artifactRoot: join(workspaceDirectory, 'noop-rebuild-target'),
-        schedulerStopped: true,
         expectedConfigurationReferences: configurationReferences,
         expectedContractHashes: contractHashes,
         rebuildAndValidateProjections: async () => ({
@@ -366,7 +383,6 @@ describe.sequential('PostgreSQL fixture backup and restore', () => {
         pool: failed,
         backupDirectory,
         artifactRoot: join(workspaceDirectory, 'failed-rebuild-target'),
-        schedulerStopped: true,
         expectedConfigurationReferences: configurationReferences,
         expectedContractHashes: contractHashes,
         rebuildAndValidateProjections: async () => {
@@ -380,7 +396,7 @@ describe.sequential('PostgreSQL fixture backup and restore', () => {
     await failed.end();
   });
 
-  it('validates tampering and scheduler state before any target database write', async () => {
+  it('validates tampering before any target database write', async () => {
     const { stored } = await seedProjectAndArtifact();
     const backupDirectory = join(workspaceDirectory, 'backup-tampered');
     await createFixtureBackup({
@@ -402,7 +418,6 @@ describe.sequential('PostgreSQL fixture backup and restore', () => {
         pool: target,
         backupDirectory,
         artifactRoot: join(workspaceDirectory, 'tampered-target'),
-        schedulerStopped: true,
         expectedConfigurationReferences: configurationReferences,
         expectedContractHashes: contractHashes,
         rebuildAndValidateProjections: async () => ({
@@ -413,25 +428,85 @@ describe.sequential('PostgreSQL fixture backup and restore', () => {
         }),
       }),
     ).rejects.toThrow('Artifact backup failed integrity validation');
-    await expect(
-      restoreFixtureBackup({
-        pool: target,
-        backupDirectory,
-        artifactRoot: join(workspaceDirectory, 'scheduler-running-target'),
-        schedulerStopped: false,
-        expectedConfigurationReferences: configurationReferences,
-        expectedContractHashes: contractHashes,
-        rebuildAndValidateProjections: async () => ({
-          schemaVersion: '1.0',
-          projection: 'project-events',
-          validatedProjectIds: [],
-          blockedProjectIds: [],
-        }),
-      }),
-    ).rejects.toThrow('Restore requires a stopped scheduler');
     await expect(target.query('SELECT count(*)::text AS count FROM aggregates')).resolves.toEqual(
       before,
     );
     await target.end();
   });
+
+  it('excludes a concurrent control-plane submission until validated restore releases maintenance', async () => {
+    const { submitted } = await seedProjectAndArtifact();
+    const backupDirectory = join(workspaceDirectory, 'backup-maintenance-race');
+    await createFixtureBackup({
+      pool: source,
+      artifactRoot: sourceArtifacts,
+      outputDirectory: backupDirectory,
+      configurationReferences,
+      contractHashes,
+    });
+    const target = await createTargetPool('moonshift_backup_maintenance_race');
+    let enterRebuild = (): void => undefined;
+    const rebuildEntered = new Promise<void>((resolve) => {
+      enterRebuild = resolve;
+    });
+    let releaseRebuild = (): void => undefined;
+    const rebuildRelease = new Promise<void>((resolve) => {
+      releaseRebuild = resolve;
+    });
+    const restore = restoreFixtureBackup({
+      pool: target,
+      backupDirectory,
+      artifactRoot: join(workspaceDirectory, 'maintenance-race-target'),
+      expectedConfigurationReferences: configurationReferences,
+      expectedContractHashes: contractHashes,
+      rebuildAndValidateProjections: async (context) => {
+        const report = await recoverPostgresDeliveryStateWithMaintenance(target, context.client);
+        enterRebuild();
+        await rebuildRelease;
+        return {
+          schemaVersion: '1.0',
+          projection: 'project-events',
+          validatedProjectIds: report.projectionValidatedProjectIds,
+          blockedProjectIds: report.projectionReplayBlockedProjectIds,
+        };
+      },
+    });
+    await rebuildEntered;
+
+    const concurrentService = new ProjectService({
+      repository: new PostgresProjectRepository(target),
+      scheduler: new FixtureScheduler({
+        now: () => new Date('2026-09-01T08:02:00.000Z'),
+        nextId: createDeterministicUuid('backup-maintenance-race-scheduler'),
+        expectedRevision: revision,
+      }),
+      nextId: createDeterministicUuid('backup-maintenance-race-project'),
+    });
+    let submissionSettled = false;
+    const concurrentSubmission = concurrentService
+      .submitObjective({
+        actorId: '77000000-0000-4000-8000-000000000001',
+        idempotencyKey: 'backup-maintenance-race-objective',
+        correlationId: '77000000-0000-4000-8000-000000000003',
+        objective: 'Run only after validated restore releases database maintenance',
+        fixtureScenario: 'PASS',
+      })
+      .finally(() => {
+        submissionSettled = true;
+      });
+    await waitForBlockedMaintenanceOperation(target);
+    expect(submissionSettled).toBe(false);
+    await expect(
+      target.query('SELECT count(*)::integer AS count FROM project_snapshots'),
+    ).resolves.toMatchObject({ rows: [{ count: 1 }] });
+
+    releaseRebuild();
+    const [restored, created] = await Promise.all([restore, concurrentSubmission]);
+    expect(restored.schedulingMayResume).toBe(true);
+    expect(created.view.projectId).not.toBe(submitted.view.projectId);
+    await expect(
+      target.query('SELECT count(*)::integer AS count FROM project_snapshots'),
+    ).resolves.toMatchObject({ rows: [{ count: 2 }] });
+    await target.end();
+  }, 120_000);
 });

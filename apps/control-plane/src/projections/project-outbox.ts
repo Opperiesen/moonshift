@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
+import { withMaintenanceOperation } from '@moonshift/persistence';
 
 const PROJECT_EVENT_PROJECTION = 'project-events';
 const CLAIM_DURATION_MS = 30_000;
@@ -45,8 +46,9 @@ async function deliverNextProjectEvent(input: {
   readonly pool: Pool;
   readonly workerId: string;
   readonly projectId?: string;
+  readonly maintenanceClient?: PoolClient;
 }): Promise<{ readonly delivered: boolean; readonly applied: boolean }> {
-  return transaction(input.pool, async (client) => {
+  const run = async (client: PoolClient) => {
     const claimed = await client.query<ClaimedProjectEvent>(
       `WITH candidate AS (
          SELECT pending.event_id
@@ -147,14 +149,27 @@ async function deliverNextProjectEvent(input: {
     );
     if ((acknowledged.rowCount ?? 0) !== 1) throw new Error('PROJECT_OUTBOX_CLAIM_LOST');
     return { delivered: true, applied };
-  });
+  };
+  if (input.maintenanceClient !== undefined) {
+    await input.maintenanceClient.query('BEGIN');
+    try {
+      const result = await run(input.maintenanceClient);
+      await input.maintenanceClient.query('COMMIT');
+      return result;
+    } catch (error) {
+      await input.maintenanceClient.query('ROLLBACK').catch(() => undefined);
+      throw error;
+    }
+  }
+  return transaction(input.pool, run);
 }
 
-export async function drainProjectOutbox(input: {
+async function drainProjectOutboxUnlocked(input: {
   readonly pool: Pool;
   readonly workerId: string;
   readonly projectId: string;
   readonly expectedLastSequence: number;
+  readonly maintenanceClient?: PoolClient;
 }): Promise<ProjectOutboxDeliveryReport> {
   let deliveredEvents = 0;
   let projectionEventsApplied = 0;
@@ -164,7 +179,7 @@ export async function drainProjectOutbox(input: {
     deliveredEvents += 1;
     if (delivered.applied) projectionEventsApplied += 1;
   }
-  const checkpoint = await input.pool.query<{ last_sequence: string }>(
+  const checkpoint = await (input.maintenanceClient ?? input.pool).query<{ last_sequence: string }>(
     `SELECT last_sequence::text
      FROM projection_checkpoints
      WHERE projection_name = $1 AND project_id = $2`,
@@ -173,4 +188,17 @@ export async function drainProjectOutbox(input: {
   const lastSequence = Number(checkpoint.rows[0]?.last_sequence ?? 0);
   if (lastSequence < input.expectedLastSequence) throw new Error('PROJECT_OUTBOX_PROJECTION_GAP');
   return Object.freeze({ deliveredEvents, projectionEventsApplied, lastSequence });
+}
+
+export async function drainProjectOutbox(input: {
+  readonly pool: Pool;
+  readonly workerId: string;
+  readonly projectId: string;
+  readonly expectedLastSequence: number;
+  readonly maintenanceClient?: PoolClient;
+}): Promise<ProjectOutboxDeliveryReport> {
+  if (input.maintenanceClient !== undefined) return drainProjectOutboxUnlocked(input);
+  return withMaintenanceOperation(input.pool, (maintenanceClient) =>
+    drainProjectOutboxUnlocked({ ...input, maintenanceClient }),
+  );
 }

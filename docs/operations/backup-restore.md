@@ -28,11 +28,23 @@ verify artifact ownership and hashes, and rebuild durable projections before sch
 resume. Any missing, changed, unknown, or unverifiable item fails closed and leaves scheduling
 stopped for supervisor attention. Restore must not silently retry effects or fabricate audit history.
 
+The fixture restore API enforces that stopped boundary in PostgreSQL rather than trusting a caller
+assertion. It holds one exclusive session advisory lock from before target inspection until the
+restored projection proof is accepted. Normal PostgreSQL project creates and mutations, runtime
+heartbeats, event retention, startup recovery, and project-outbox delivery take the matching shared
+maintenance lock, so they wait while restore owns the exclusive lock. The reconstruction callback
+receives the lock-owning database client and must use the maintenance-aware recovery entry point;
+opening the normal recovery path from inside restore would correctly wait on the restore itself.
+
 The restore API requires its reconstruction callback to return a structured project-event proof. The
 restore orchestrator then independently compares that proof with every restored project snapshot,
 requires an exact project-event checkpoint at each snapshot's final sequence, and requires no
 unpublished outbox event. An absent callback, a no-op callback, a blocked project, an incomplete
 checkpoint, or a reconstruction failure cannot produce `schedulingMayResume: true`.
+
+The lock is released only after that complete proof succeeds or the restore fails closed. Callers may
+resume scheduling only when the returned result contains `schedulingMayResume: true`; a boolean claim
+that a scheduler was stopped is neither accepted nor sufficient.
 
 Migrations are forward-only. Before applying a migration, take a backup of the pre-upgrade set. A
 rollback for an unsupported downgrade is restoration of that pre-upgrade set; automatic down-migration

@@ -125,12 +125,10 @@ export class InMemoryProjectRepository implements ProjectRepository {
           project.supervision.authority.executionState,
         ),
       ).length,
-      activeRunnerJobs: records.filter(
-        (project) =>
-          project.scheduling.runtime.status === 'RUNNING' ||
-          project.supervision.effects.some(({ state }) =>
-            ['EXECUTING', 'UNKNOWN', 'RECONCILING'].includes(state),
-          ),
+      activeRunnerJobs: records.filter((project) =>
+        project.supervision.effects.some(({ state }) =>
+          ['EXECUTING', 'UNKNOWN', 'RECONCILING'].includes(state),
+        ),
       ).length,
       authorityNow,
     });

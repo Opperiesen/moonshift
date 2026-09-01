@@ -251,56 +251,50 @@ describe('runtime and control-plane restart recovery', () => {
       sequence: 1,
       aggregate: { type: 'PROJECT', id: projectId, version: 1 },
     };
+    const query = async (statement: string) => {
+      statements.push(statement);
+      if (statement.includes('pg_advisory_unlock_shared')) return { rows: [{ unlocked: true }] };
+      if (statement.includes('FROM project_snapshots'))
+        return {
+          rows: [
+            {
+              project_id: projectId,
+              retained_from_sequence: '1',
+              record: { view: { lastSequence: 1 }, events: [event] },
+            },
+          ],
+        };
+      if (statement.includes('FROM project_events stored')) return { rowCount: 1 };
+      if (statement.includes('FROM project_events'))
+        return { rows: [{ event_id: eventId, project_sequence: '1' }] };
+      if (statement.includes('WITH candidate AS')) {
+        if (outboxClaimed) return { rows: [] };
+        outboxClaimed = true;
+        return {
+          rows: [
+            {
+              event_id: eventId,
+              project_id: projectId,
+              project_sequence: '1',
+              aggregate_type: 'PROJECT',
+              aggregate_id: projectId,
+              aggregate_version: 1,
+              payload: event,
+              claim_token: '1',
+            },
+          ],
+        };
+      }
+      if (statement.includes('SELECT last_sequence::text'))
+        return { rows: [{ last_sequence: statement.includes('FOR UPDATE') ? '0' : '1' }] };
+      if (statement.includes("status = 'AVAILABLE'")) return { rowCount: 1 };
+      if (statement.includes("status = 'PENDING'") && !statement.includes('project_id = $1'))
+        return { rowCount: 2 };
+      return { rowCount: 1 };
+    };
     const pool = {
-      query: async (statement: string) => {
-        statements.push(statement);
-        if (statement.includes('FROM project_snapshots'))
-          return {
-            rows: [
-              {
-                project_id: projectId,
-                retained_from_sequence: '1',
-                record: { view: { lastSequence: 1 }, events: [event] },
-              },
-            ],
-          };
-        if (statement.includes('FROM project_events'))
-          return { rows: [{ event_id: eventId, project_sequence: '1' }] };
-        if (statement.includes('SELECT last_sequence::text'))
-          return { rows: [{ last_sequence: '1' }] };
-        if (statement.includes("status = 'AVAILABLE'")) return { rowCount: 1 };
-        if (statement.includes("status = 'PENDING'") && !statement.includes('project_id = $1'))
-          return { rowCount: 2 };
-        return { rowCount: 1 };
-      },
-      connect: async () => ({
-        query: async (statement: string) => {
-          statements.push(statement);
-          if (statement.includes('WITH candidate AS')) {
-            if (outboxClaimed) return { rows: [] };
-            outboxClaimed = true;
-            return {
-              rows: [
-                {
-                  event_id: eventId,
-                  project_id: projectId,
-                  project_sequence: '1',
-                  aggregate_type: 'PROJECT',
-                  aggregate_id: projectId,
-                  aggregate_version: 1,
-                  payload: event,
-                  claim_token: '1',
-                },
-              ],
-            };
-          }
-          if (statement.includes('FROM project_events stored')) return { rowCount: 1 };
-          if (statement.includes('SELECT last_sequence::text'))
-            return { rows: [{ last_sequence: '0' }] };
-          return { rowCount: 1 };
-        },
-        release: () => undefined,
-      }),
+      query,
+      connect: async () => ({ query, release: () => undefined }),
     };
     const report = await recoverPostgresDeliveryState(pool as unknown as import('pg').Pool);
 
@@ -317,5 +311,7 @@ describe('runtime and control-plane restart recovery', () => {
     expect(statements.join('\n')).toContain("status = 'AVAILABLE'");
     expect(statements.join('\n')).toContain("status = 'PENDING'");
     expect(statements.join('\n')).toContain("'project-events'");
+    expect(statements.join('\n')).toContain('pg_advisory_lock_shared');
+    expect(statements.join('\n')).toContain('pg_advisory_unlock_shared');
   });
 });

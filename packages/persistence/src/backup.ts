@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, relative, sep } from 'node:path';
 import type { Pool, PoolClient } from 'pg';
 
 import { FOUNDATION_MIGRATIONS } from './migrations/manifest.js';
+import { withRestoreMaintenance, type RestoreMaintenanceContext } from './maintenance.js';
 
 const BACKUP_SCHEMA_VERSION = '1.0' as const;
 const DATABASE_FILE = 'database.json';
@@ -540,7 +541,7 @@ export async function validateFixtureBackup(input: {
   });
 }
 
-async function assertRestoreTargetEmpty(pool: Pool): Promise<void> {
+async function assertRestoreTargetEmpty(pool: Pick<Pool, 'query'>): Promise<void> {
   for (const table of RESTORE_EMPTY_TABLES) {
     const result = await pool.query<{ count: string }>(
       `SELECT count(*)::text AS count FROM ${table}`,
@@ -598,7 +599,7 @@ function assertProjectionRebuildProof(
 }
 
 async function assertRestoredProjectEventProjection(
-  pool: Pool,
+  pool: Pick<Pool, 'query'>,
   proof: FixtureProjectionRebuildProof,
 ): Promise<void> {
   const state = await pool.query<{
@@ -653,22 +654,27 @@ async function assertRestoredProjectEventProjection(
   }
 }
 
-export async function restoreFixtureBackup(input: {
+type RestoreFixtureBackupInput = {
   readonly pool: Pool;
   readonly backupDirectory: string;
   readonly artifactRoot: string;
-  readonly schedulerStopped: boolean;
   readonly expectedConfigurationReferences: Readonly<Record<string, string>>;
   readonly expectedContractHashes: Readonly<Record<string, `sha256:${string}`>>;
-  readonly rebuildAndValidateProjections: () => Promise<FixtureProjectionRebuildProof>;
+  readonly rebuildAndValidateProjections: (
+    context: RestoreMaintenanceContext,
+  ) => Promise<FixtureProjectionRebuildProof>;
   readonly monotonicNow?: () => number;
-}): Promise<{
+};
+
+async function restoreFixtureBackupUnlocked(
+  input: RestoreFixtureBackupInput,
+  context: RestoreMaintenanceContext,
+): Promise<{
   readonly schedulingMayResume: true;
   readonly manifest: FixtureBackupManifest;
   readonly projectionRebuildProof: FixtureProjectionRebuildProof;
   readonly metrics: FixtureRestoreMetrics;
 }> {
-  if (!input.schedulerStopped) throw new Error('Restore requires a stopped scheduler');
   if (typeof input.rebuildAndValidateProjections !== 'function') {
     throw new Error('Restore requires projection reconstruction and validation');
   }
@@ -678,7 +684,7 @@ export async function restoreFixtureBackup(input: {
     expectedConfigurationReferences: input.expectedConfigurationReferences,
     expectedContractHashes: input.expectedContractHashes,
   });
-  await assertRestoreTargetEmpty(input.pool);
+  await assertRestoreTargetEmpty(context.client);
   try {
     await lstat(input.artifactRoot);
     throw new Error('Restore artifact target must not already exist');
@@ -693,7 +699,7 @@ export async function restoreFixtureBackup(input: {
       stageDirectory,
       validated.manifest.artifacts,
     );
-    const client = await input.pool.connect();
+    const client = context.client;
     try {
       await client.query('BEGIN');
       for (const table of validated.database.tables) {
@@ -713,13 +719,11 @@ export async function restoreFixtureBackup(input: {
     } catch (error) {
       await client.query('ROLLBACK').catch(() => undefined);
       throw error;
-    } finally {
-      client.release();
     }
     await rename(stageDirectory, input.artifactRoot);
-    const projectionRebuildProof = await input.rebuildAndValidateProjections();
+    const projectionRebuildProof = await input.rebuildAndValidateProjections(context);
     assertProjectionRebuildProof(projectionRebuildProof);
-    await assertRestoredProjectEventProjection(input.pool, projectionRebuildProof);
+    await assertRestoredProjectEventProjection(context.client, projectionRebuildProof);
     const finishedAt = input.monotonicNow?.() ?? performance.now();
     return Object.freeze({
       schedulingMayResume: true,
@@ -740,4 +744,12 @@ export async function restoreFixtureBackup(input: {
     await rm(stageDirectory, { recursive: true, force: true });
     throw error;
   }
+}
+
+export async function restoreFixtureBackup(
+  input: RestoreFixtureBackupInput,
+): Promise<Awaited<ReturnType<typeof restoreFixtureBackupUnlocked>>> {
+  return withRestoreMaintenance(input.pool, (context) =>
+    restoreFixtureBackupUnlocked(input, context),
+  );
 }

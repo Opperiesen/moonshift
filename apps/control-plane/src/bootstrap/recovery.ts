@@ -1,4 +1,5 @@
-import type { Pool } from 'pg';
+import { withMaintenanceOperation } from '@moonshift/persistence';
+import type { Pool, PoolClient } from 'pg';
 
 import { assertExecutionCheckpoint } from '../application/recovery/checkpoints.js';
 import { drainProjectOutbox } from '../projections/project-outbox.js';
@@ -55,18 +56,21 @@ function eventReplayState(
   return events.every(({ sequence }, index) => sequence === index + 1) ? 'CONTIGUOUS' : 'GAP';
 }
 
-export async function recoverPostgresDeliveryState(pool: Pool): Promise<DeliveryRecoveryReport> {
-  const releasedQueue = await pool.query(
+async function recoverPostgresDeliveryStateUnlocked(
+  pool: Pool,
+  maintenanceClient: PoolClient,
+): Promise<DeliveryRecoveryReport> {
+  const releasedQueue = await maintenanceClient.query(
     `UPDATE queue_items
      SET status = 'AVAILABLE', claimed_by = NULL, claimed_at = NULL, claim_expires_at = NULL
      WHERE status = 'CLAIMED' AND claim_expires_at <= clock_timestamp()`,
   );
-  const releasedOutbox = await pool.query(
+  const releasedOutbox = await maintenanceClient.query(
     `UPDATE outbox_events
      SET status = 'PENDING', claimed_by = NULL, claimed_at = NULL, claim_expires_at = NULL
      WHERE status = 'CLAIMED' AND claim_expires_at <= clock_timestamp()`,
   );
-  const snapshots = await pool.query<{
+  const snapshots = await maintenanceClient.query<{
     project_id: string;
     retained_from_sequence: string;
     record: DurableRecoveryRecord;
@@ -92,7 +96,10 @@ export async function recoverPostgresDeliveryState(pool: Pool): Promise<Delivery
       blockProjection(snapshot.project_id, 'SNAPSHOT_EVENT_GAP');
       continue;
     }
-    const retained = await pool.query<{ event_id: string; project_sequence: string }>(
+    const retained = await maintenanceClient.query<{
+      event_id: string;
+      project_sequence: string;
+    }>(
       `SELECT event_id, project_sequence::text
        FROM project_events WHERE project_id = $1 ORDER BY project_events.project_sequence`,
       [snapshot.project_id],
@@ -129,7 +136,7 @@ export async function recoverPostgresDeliveryState(pool: Pool): Promise<Delivery
         break;
       }
       try {
-        const inserted = await pool.query(
+        const inserted = await maintenanceClient.query(
           `INSERT INTO outbox_events
              (event_id, project_id, project_sequence, aggregate_type, aggregate_id,
               aggregate_version, payload)
@@ -146,7 +153,7 @@ export async function recoverPostgresDeliveryState(pool: Pool): Promise<Delivery
           ],
         );
         replayedOutboxEvents += inserted.rowCount ?? 0;
-        const verified = await pool.query(
+        const verified = await maintenanceClient.query(
           `SELECT 1 FROM outbox_events
            WHERE event_id = $1 AND project_id = $2 AND project_sequence = $3
              AND aggregate_type = $4 AND aggregate_id = $5 AND aggregate_version = $6
@@ -174,7 +181,7 @@ export async function recoverPostgresDeliveryState(pool: Pool): Promise<Delivery
       blockProjection(snapshot.project_id, 'OUTBOX_REPLAY_CONFLICT');
       continue;
     }
-    await pool.query(
+    await maintenanceClient.query(
       `UPDATE outbox_events pending
        SET status = 'PENDING',
            published_at = NULL,
@@ -198,6 +205,7 @@ export async function recoverPostgresDeliveryState(pool: Pool): Promise<Delivery
         workerId: 'startup-project-events',
         projectId: snapshot.project_id,
         expectedLastSequence: record.view.lastSequence,
+        maintenanceClient,
       });
       publishedOutboxEvents += delivery.deliveredEvents;
       projectionCheckpointsAdvanced += delivery.projectionEventsApplied;
@@ -222,6 +230,19 @@ export async function recoverPostgresDeliveryState(pool: Pool): Promise<Delivery
       projectionReplayFailures.map((failure) => Object.freeze(failure)),
     ),
   });
+}
+
+export async function recoverPostgresDeliveryState(pool: Pool): Promise<DeliveryRecoveryReport> {
+  return withMaintenanceOperation(pool, (client) =>
+    recoverPostgresDeliveryStateUnlocked(pool, client),
+  );
+}
+
+export async function recoverPostgresDeliveryStateWithMaintenance(
+  pool: Pool,
+  maintenanceClient: PoolClient,
+): Promise<DeliveryRecoveryReport> {
+  return recoverPostgresDeliveryStateUnlocked(pool, maintenanceClient);
 }
 
 export async function reconstructDurableState(input: {

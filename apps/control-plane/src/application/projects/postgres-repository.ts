@@ -1,5 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
-import { persistVerificationRecords } from '@moonshift/persistence';
+import { acquireMaintenanceSharedLock, persistVerificationRecords } from '@moonshift/persistence';
 
 import {
   ControlPlaneError,
@@ -50,11 +50,10 @@ async function capacitySnapshot(client: PoolClient): Promise<ProjectCapacitySnap
           IN ('STARTING', 'RUNNING', 'WAITING_FOR_APPROVAL', 'CHECKPOINTING')
       )::integer AS active_cognitive_runs,
       count(*) FILTER (
-        WHERE record#>>'{scheduling,runtime,status}' = 'RUNNING'
-           OR EXISTS (
-             SELECT 1 FROM jsonb_array_elements(record->'supervision'->'effects') effect
-             WHERE effect->>'state' IN ('EXECUTING', 'UNKNOWN', 'RECONCILING')
-           )
+        WHERE EXISTS (
+          SELECT 1 FROM jsonb_array_elements(record->'supervision'->'effects') effect
+          WHERE effect->>'state' IN ('EXECUTING', 'UNKNOWN', 'RECONCILING')
+        )
       )::integer AS active_runner_jobs,
       to_char(clock_timestamp() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') AS authority_now
     FROM project_snapshots`);
@@ -190,6 +189,7 @@ export class PostgresProjectRepository implements ProjectRepository {
     input: CreateProjectRecordInput,
   ): Promise<{ reused: boolean; record: ProjectRecord }> {
     const result = await transaction(this.pool, async (client) => {
+      await acquireMaintenanceSharedLock(client);
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
         'project-capacity',
       ]);
@@ -284,6 +284,7 @@ export class PostgresProjectRepository implements ProjectRepository {
 
   async expireEventsBefore(projectId: string, sequence: number): Promise<void> {
     await transaction(this.pool, async (client) => {
+      await acquireMaintenanceSharedLock(client);
       const updated = await client.query(
         `UPDATE project_snapshots
          SET retained_from_sequence = LEAST(
@@ -318,6 +319,7 @@ export class PostgresProjectRepository implements ProjectRepository {
 
   async recordRuntimeHeartbeat(input: RuntimeHeartbeatInput): Promise<RuntimeHeartbeatResult> {
     return transaction(this.pool, async (client) => {
+      await acquireMaintenanceSharedLock(client);
       await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
         `project:${input.projectId}`,
       ]);
@@ -399,6 +401,7 @@ export class PostgresProjectRepository implements ProjectRepository {
     readonly record: ProjectRecord;
   }> {
     const result = await transaction(this.pool, async (client) => {
+      await acquireMaintenanceSharedLock(client);
       if (input.reserveCognitiveCapacity || input.reserveRunnerCapacity) {
         await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
           'project-capacity',
