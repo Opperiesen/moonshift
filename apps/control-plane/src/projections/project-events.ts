@@ -11,7 +11,10 @@ export class ProjectEventSequence {
     private readonly correlationId: string,
     private readonly occurredAt: string,
     private readonly nextId: () => string,
-  ) {}
+    initialSequence = 0,
+  ) {
+    this.sequence = initialSequence;
+  }
 
   append(input: {
     readonly kind: EventKind;

@@ -40,6 +40,13 @@ const openapi = YAML.parse(
   readFileSync(resolve(contractRoot, 'http-api.openapi.yaml'), 'utf8'),
 ) as {
   components: { schemas: Record<string, AnySchemaObject> };
+  paths: Record<
+    string,
+    {
+      get?: { responses: Record<string, unknown> };
+      post?: { responses: Record<string, unknown> };
+    }
+  >;
 };
 
 function ajv(): Ajv2020 {
@@ -214,6 +221,35 @@ describe('planning contract source validity', () => {
     expect(openapi.components.schemas.ExecutionState?.enum).toEqual(EXECUTION_STATES);
     expect(openapi.components.schemas.PresenceState?.enum).toEqual(PRESENCE_STATES);
   });
+
+  it('documents every runtime supervision response status', () => {
+    const responseStatuses = (path: string, method: 'get' | 'post') =>
+      Object.keys(openapi.paths[path]?.[method]?.responses ?? {}).sort();
+    for (const command of ['pause', 'resume', 'stop', 'cancel']) {
+      expect(responseStatuses(`/v1/projects/{projectId}/commands/${command}`, 'post')).toEqual([
+        '202',
+        '400',
+        '401',
+        '404',
+        '409',
+        '412',
+      ]);
+    }
+    expect(responseStatuses('/v1/projects/{projectId}/approvals', 'get')).toEqual([
+      '200',
+      '400',
+      '401',
+      '404',
+    ]);
+    expect(responseStatuses('/v1/projects/{projectId}/approvals/{approvalId}', 'get')).toEqual([
+      '200',
+      '401',
+      '404',
+    ]);
+    expect(
+      responseStatuses('/v1/projects/{projectId}/approvals/{approvalId}/decision', 'post'),
+    ).toEqual(['200', '400', '401', '403', '404', '409', '412', '422']);
+  });
 });
 
 describe('contract examples and lifecycle satisfiability', () => {
@@ -380,6 +416,10 @@ describe('contract examples and lifecycle satisfiability', () => {
         leaseId: uuid(35),
         executionId: uuid(4),
         fencingToken: 2,
+        effectId: uuid(38),
+        actionDigest: hash,
+        authorizedAt: '2026-01-01T00:00:00.000Z',
+        approvalExpiresAt: '2026-01-01T00:01:00.000Z',
         expiresAt: '2026-01-01T00:01:00.000Z',
         resources: resourceRequest,
       },
@@ -407,6 +447,9 @@ describe('contract examples and lifecycle satisfiability', () => {
         ...runnerBase,
         messageId: uuid(43),
         kind: 'runner.reconcile',
+        leaseId: uuid(35),
+        executionId: uuid(4),
+        fencingToken: 2,
         effectId: uuid(38),
         actionDigest: hash,
       },

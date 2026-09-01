@@ -45,22 +45,6 @@ function normalizeSerial(serial: string): string {
   return normalized.length === 0 ? '0' : normalized;
 }
 
-function hasUriIdentity(
-  subjectAlternativeName: string | undefined,
-  kind: 'instance' | 'runner',
-  identity: string,
-): boolean {
-  if (subjectAlternativeName === undefined) return false;
-  const expected = `URI:urn:moonshift:${kind}:${identity}`;
-  return subjectAlternativeName.split(/,\s*/u).includes(expected);
-}
-
-function hasUriKind(subjectAlternativeName: string | undefined, kind: 'instance' | 'runner') {
-  return subjectAlternativeName
-    ?.split(/,\s*/u)
-    .some((value) => value.startsWith(`URI:urn:moonshift:${kind}:`));
-}
-
 function hasExclusiveUriIdentity(
   subjectAlternativeName: string | undefined,
   kind: 'instance' | 'runner',
@@ -78,6 +62,10 @@ function uuidFrom(value: string): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-8${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
 }
 
+function authorityKey(leaseId: string, executionId: string, fencingToken: number): string {
+  return `${leaseId}:${executionId}:${String(fencingToken)}`;
+}
+
 export class FixtureRunnerServer {
   readonly leaseRegistry: FixtureLeaseRegistry;
   readonly effectLedger: FixtureEffectLedger;
@@ -92,6 +80,10 @@ export class FixtureRunnerServer {
   private readonly messageWaiters = new Map<string, Set<() => void>>();
   private readonly activeExecutionControllers = new Set<AbortController>();
   private readonly activeExecutionPromises = new Set<Promise<unknown>>();
+  private readonly activeExecutions = new Map<
+    string,
+    { readonly controller: AbortController; readonly execution: Promise<unknown> }
+  >();
   private readonly capacity: FixtureResourceCapacity;
   private readonly runnerCertificateSerial: string;
   private authorityQuarantined = false;
@@ -106,7 +98,10 @@ export class FixtureRunnerServer {
     this.runnerCertificateSerial = normalizeSerial(runnerCertificate.serialNumber);
     this.journal = new FixtureRunnerJournal(options.stateDirectory, options.journalFileSystem);
     this.journal.beginRuntimeSession();
-    this.leaseRegistry = new FixtureLeaseRegistry(this.journal.leaseOffers);
+    this.leaseRegistry = new FixtureLeaseRegistry(
+      this.journal.leaseOffers,
+      this.journal.revokedLeaseAuthorities,
+    );
     this.effectLedger = new FixtureEffectLedger(this.journal.effects);
     this.executor = new FixtureProcessExecutor(this.effectLedger, this.journal);
     const mayBootstrapConfiguredEnrollments =
@@ -156,8 +151,7 @@ export class FixtureRunnerServer {
       enrollment === undefined ||
       this.revokedSerials.has(serialNumber) ||
       enrollment.instanceId !== this.options.instanceId ||
-      !hasUriIdentity(certificate.subjectaltname, 'instance', enrollment.instanceId) ||
-      hasUriKind(certificate.subjectaltname, 'runner')
+      !hasExclusiveUriIdentity(certificate.subjectaltname, 'instance', enrollment.instanceId)
     ) {
       this.metrics.rejectedConnections += 1;
       socket.destroy();
@@ -218,19 +212,26 @@ export class FixtureRunnerServer {
       const offer = bound as unknown as FixtureLeaseOffer;
       const eligibility = evaluateFixtureEligibility(offer.resources, this.capacity);
       if (!eligibility.eligible) throw new Error(eligibility.reason);
-      const offeredAt = this.options.now();
-      const candidateRegistry = new FixtureLeaseRegistry(this.journal.leaseOffers);
-      candidateRegistry.offer(offer, this.options.runnerId, offeredAt);
+      const candidateRegistry = new FixtureLeaseRegistry(
+        this.journal.leaseOffers,
+        this.journal.revokedLeaseAuthorities,
+      );
+      candidateRegistry.offer(offer, this.options.runnerId);
       this.journal.recordLeaseAndMessage(messageId, {
         leaseId: offer.leaseId,
         executionId: offer.executionId,
         fencingToken: offer.fencingToken,
+        effectId: offer.effectId,
+        actionDigest: offer.actionDigest,
+        authorizedAt: offer.authorizedAt,
+        approvalExpiresAt: offer.approvalExpiresAt,
         expiresAt: offer.expiresAt,
         resources: offer.resources,
         runnerId: this.options.runnerId,
         revoked: false,
+        consumed: false,
       });
-      this.leaseRegistry.offer(offer, this.options.runnerId, offeredAt);
+      this.leaseRegistry.offer(offer, this.options.runnerId);
     } else if (bound.kind === 'runner.run_fixture') {
       const command = bound as {
         messageId: string;
@@ -242,15 +243,24 @@ export class FixtureRunnerServer {
         effectId: string;
         actionDigest: string;
       };
-      const lease = this.leaseRegistry.current(
+      const lease = this.leaseRegistry.availableForEffect(
         command.leaseId,
         command.executionId,
         command.fencingToken,
-        this.options.now(),
+        command.effectId,
+        command.actionDigest,
       );
       if (lease === null) {
-        throw new Error('Stale or invalid runner lease fence');
+        throw new Error('Runner lease is not authorized for this effect or is already consumed');
       }
+      this.journal.recordLeaseConsumption(command);
+      this.leaseRegistry.consumeEffect(
+        command.leaseId,
+        command.executionId,
+        command.fencingToken,
+        command.effectId,
+        command.actionDigest,
+      );
       const controller = new AbortController();
       this.activeExecutionControllers.add(controller);
       const executionPromise = this.executor.run(
@@ -267,14 +277,19 @@ export class FixtureRunnerServer {
               command.leaseId,
               command.executionId,
               command.fencingToken,
-              this.options.now(),
             ),
         },
       );
+      const executionKey = authorityKey(command.leaseId, command.executionId, command.fencingToken);
+      this.activeExecutions.set(executionKey, {
+        controller,
+        execution: executionPromise,
+      });
       this.activeExecutionPromises.add(executionPromise);
       const execution = await executionPromise.finally(() => {
         this.activeExecutionControllers.delete(controller);
         this.activeExecutionPromises.delete(executionPromise);
+        this.activeExecutions.delete(executionKey);
       });
       const result = {
         schemaVersion: '1.0',
@@ -294,8 +309,92 @@ export class FixtureRunnerServer {
       if (!planningValidators().runnerProtocol.validate(result))
         throw new Error('Runner produced invalid result');
       authenticated.socket.write(`${JSON.stringify(result)}\n`);
+    } else if (bound.kind === 'runner.cancel') {
+      const command = bound as {
+        messageId: string;
+        correlationId: string;
+        leaseId: string;
+        executionId: string;
+        fencingToken: number;
+        reason: string;
+      };
+      this.journal.recordLeaseRevocationAndMessage(command.messageId, command);
+      this.leaseRegistry.revoke(command.leaseId, command.executionId, command.fencingToken);
+      const active = this.activeExecutions.get(
+        authorityKey(command.leaseId, command.executionId, command.fencingToken),
+      );
+      active?.controller.abort();
+      if (active !== undefined) await Promise.allSettled([active.execution]);
+      const effect = [...this.journal.effects]
+        .reverse()
+        .find(
+          (candidate) =>
+            candidate.executionId === command.executionId &&
+            candidate.leaseId === command.leaseId &&
+            candidate.fencingToken === command.fencingToken,
+        );
+      const result = {
+        schemaVersion: '1.0',
+        messageId: uuidFrom(`runner-result:${command.messageId}`),
+        kind: 'runner.result',
+        instanceId: authenticated.enrollment.instanceId,
+        runnerId: this.options.runnerId,
+        correlationId: command.correlationId,
+        sentAt: this.options.now().toISOString(),
+        operationMessageId: command.messageId,
+        leaseId: command.leaseId,
+        executionId: command.executionId,
+        fencingToken: command.fencingToken,
+        outcome: effect === undefined ? 'CANCELLED' : 'APPLIED',
+        groundTruthDigest: effect?.groundTruthDigest ?? null,
+      };
+      if (!planningValidators().runnerProtocol.validate(result))
+        throw new Error('Runner produced invalid cancellation result');
+      authenticated.socket.write(`${JSON.stringify(result)}\n`);
+    } else if (bound.kind === 'runner.reconcile') {
+      const command = bound as {
+        messageId: string;
+        correlationId: string;
+        effectId: string;
+        actionDigest: string;
+        leaseId: string;
+        executionId: string;
+        fencingToken: number;
+      };
+      const durableEffect = this.journal.effects.find(
+        ({ effectId }) => effectId === command.effectId,
+      );
+      const authorityMatches =
+        durableEffect === undefined ||
+        (durableEffect.executionId === command.executionId &&
+          durableEffect.leaseId === command.leaseId &&
+          durableEffect.fencingToken === command.fencingToken);
+      const effect = authorityMatches
+        ? this.effectLedger.lookup(command.effectId, command.actionDigest)
+        : { outcome: 'INDETERMINATE' as const, groundTruthDigest: null };
+      this.journal.recordProcessed(command.messageId);
+      const result = {
+        schemaVersion: '1.0',
+        messageId: uuidFrom(`runner-result:${command.messageId}`),
+        kind: 'runner.result',
+        instanceId: authenticated.enrollment.instanceId,
+        runnerId: this.options.runnerId,
+        correlationId: command.correlationId,
+        sentAt: this.options.now().toISOString(),
+        operationMessageId: command.messageId,
+        leaseId: command.leaseId,
+        executionId: command.executionId,
+        fencingToken: command.fencingToken,
+        outcome: effect.outcome,
+        groundTruthDigest: effect.groundTruthDigest ?? null,
+      };
+      if (!planningValidators().runnerProtocol.validate(result))
+        throw new Error('Runner produced invalid reconciliation result');
+      authenticated.socket.write(`${JSON.stringify(result)}\n`);
     } else {
-      throw new Error('Runner daemon accepts only lease offers and fixture commands');
+      throw new Error(
+        'Runner daemon accepts only lease offers, fixture commands, cancellation, and reconciliation',
+      );
     }
     this.metrics.handledMessages += 1;
     this.acceptedMessageIds.add(messageId);

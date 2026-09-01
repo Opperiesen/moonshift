@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Projects } from '../features/projects/Projects.js';
 import { Observe } from '../features/observe/Observe.js';
+import { Supervise } from '../features/supervise/Supervise.js';
 import { bootstrap, type ProjectView } from '../services/project-api.js';
 export function App() {
   const [session, setSession] = useState<'loading' | 'ready' | 'error'>('loading');
   const [project, setProject] = useState<ProjectView>();
+  const [view, setView] = useState<'observe' | 'supervise'>('observe');
   useEffect(() => {
     const secret = new URLSearchParams(location.hash.slice(1)).get('bootstrap');
     history.replaceState(null, '', location.pathname + location.search);
@@ -24,5 +26,30 @@ export function App() {
         <div role="alert">Unable to establish the supervisor session.</div>
       </main>
     );
-  return project ? <Observe initial={project} /> : <Projects onCreated={setProject} />;
+  if (project === undefined)
+    return (
+      <Projects
+        onCreated={(created) => {
+          setProject(created);
+          setView('observe');
+        }}
+      />
+    );
+  return (
+    <>
+      <nav aria-label="Project views">
+        <button onClick={() => setView('observe')} aria-pressed={view === 'observe'}>
+          Observe
+        </button>{' '}
+        <button onClick={() => setView('supervise')} aria-pressed={view === 'supervise'}>
+          Supervise
+        </button>
+      </nav>
+      {view === 'observe' ? (
+        <Observe initial={project} />
+      ) : (
+        <Supervise initial={project} onProjectChange={setProject} />
+      )}
+    </>
+  );
 }

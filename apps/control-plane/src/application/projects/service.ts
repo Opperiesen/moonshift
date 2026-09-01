@@ -18,7 +18,9 @@ import type {
   ProjectView,
 } from '../../model.js';
 import { ProjectEventSequence } from '../../projections/project-events.js';
+import { appendInitialSupervisionEvents } from '../../projections/supervision-events.js';
 import type { FixtureScheduler } from '../../scheduler/index.js';
+import { buildFixtureSupervision } from '../supervision/tool-policy.js';
 import { projectRequestHash, type ProjectRepository } from './repository.js';
 
 const SCENARIOS = new Set<FixtureScenario>([
@@ -43,7 +45,6 @@ export class ProjectService {
     private readonly dependencies: {
       readonly repository: ProjectRepository;
       readonly scheduler: FixtureScheduler;
-      readonly now: () => Date;
       readonly nextId: () => string;
     },
   ) {}
@@ -63,8 +64,6 @@ export class ProjectService {
     if (!SCENARIOS.has(command.fixtureScenario))
       throw new ControlPlaneError('FIXTURE_SCENARIO_INVALID', 'Unknown fixture scenario');
     const nextId = this.dependencies.nextId;
-    const now = this.dependencies.now();
-    const occurredAt = now.toISOString();
     const projectId = nextId();
     const project = createProject({
       projectId: asOpaqueId('Project', projectId),
@@ -141,6 +140,7 @@ export class ProjectService {
         const authorityNow = new Date(capacity.authorityNow);
         if (!Number.isFinite(authorityNow.getTime()))
           throw new ControlPlaneError('AUTHORITY_TIME_INVALID', 'Authority clock is invalid', 500);
+        const occurredAt = capacity.authorityNow;
         const delegation = createCompleteDelegation({
           delegationId: nextId(),
           projectId,
@@ -155,8 +155,8 @@ export class ProjectService {
           requiredEvidence: ['fixture-integrity', 'fixture-test'],
           capabilityGrantId: nextId(),
           budgetId: nextId(),
-          parentCapabilities: ['FIXTURE_READ', 'FIXTURE_ARTIFACT'],
-          capabilities: ['FIXTURE_READ', 'FIXTURE_ARTIFACT'],
+          parentCapabilities: ['FIXTURE_READ', 'FIXTURE_ARTIFACT', 'FIXTURE_EFFECT'],
+          capabilities: ['FIXTURE_READ', 'FIXTURE_ARTIFACT', 'FIXTURE_EFFECT'],
           parentInvocationLimit: 8,
           invocationLimit: 4,
           parentMonetaryLimitMicros: 20_000,
@@ -199,6 +199,16 @@ export class ProjectService {
         const presenceSourceType = waitsForCapacity ? ('CAPACITY' as const) : ('APPROVAL' as const);
         const waitTarget = scheduling.queueReason === 'COGNITIVE_CAPACITY' ? 'cognitive' : 'runner';
         const systemId = nextId();
+        const supervision = buildFixtureSupervision({
+          projectId,
+          taskId,
+          requesterAgentId: specialistId,
+          scheduling,
+          scenario: command.fixtureScenario,
+          authorityNow: capacity.authorityNow,
+          authorityLeaseExpiresAt: delegation.authorityLeaseExpiresAt,
+          nextId,
+        });
         const events = new ProjectEventSequence(
           projectId,
           command.correlationId,
@@ -331,6 +341,16 @@ export class ProjectService {
             payload,
           });
         }
+        const supervisionAudit = appendInitialSupervisionEvents({
+          sequence: events,
+          supervision,
+          specialistId,
+          specialistLineageId: specialist.lineageId,
+          systemId,
+          occurredAt,
+          correlationId: command.correlationId,
+          nextId,
+        });
         events.append({
           kind: 'agent.presence_changed',
           actor: { type: 'SYSTEM', id: systemId },
@@ -431,6 +451,7 @@ export class ProjectService {
           view,
           organization: Object.freeze({ specialist, delegation }),
           scheduling,
+          supervision: Object.freeze({ ...supervision, audit: supervisionAudit }),
           events: eventSnapshot,
         });
         return record;

@@ -192,6 +192,12 @@ paths:
       responses:
         "202":
           $ref: "#/components/responses/CommandAccepted"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
         "409":
           $ref: "#/components/responses/Problem"
         "412":
@@ -215,6 +221,12 @@ paths:
       responses:
         "202":
           $ref: "#/components/responses/CommandAccepted"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
         "409":
           $ref: "#/components/responses/Problem"
         "412":
@@ -240,6 +252,12 @@ paths:
       responses:
         "202":
           $ref: "#/components/responses/CommandAccepted"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
         "409":
           $ref: "#/components/responses/Problem"
         "412":
@@ -265,6 +283,12 @@ paths:
       responses:
         "202":
           $ref: "#/components/responses/CommandAccepted"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
         "409":
           $ref: "#/components/responses/Problem"
         "412":
@@ -288,14 +312,11 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: false
-                required: [items]
-                properties:
-                  items:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/ApprovalView"
+                $ref: "#/components/schemas/SupervisionView"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
         "404":
           $ref: "#/components/responses/Problem"
   /v1/projects/{projectId}/approvals/{approvalId}:
@@ -315,6 +336,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApprovalView"
+        "401":
+          $ref: "#/components/responses/Problem"
         "404":
           $ref: "#/components/responses/Problem"
   /v1/projects/{projectId}/approvals/{approvalId}/decision:
@@ -343,6 +366,14 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ApprovalView"
+        "400":
+          $ref: "#/components/responses/Problem"
+        "401":
+          $ref: "#/components/responses/Problem"
+        "403":
+          $ref: "#/components/responses/Problem"
+        "404":
+          $ref: "#/components/responses/Problem"
         "409":
           $ref: "#/components/responses/Problem"
         "412":
@@ -796,6 +827,86 @@ components:
           type: string
           minLength: 1
           maxLength: 1000
+    SupervisionView:
+      type: object
+      additionalProperties: false
+      required: [items, budget, authority, effects, blockedReasons, projectState, projectVersion]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApprovalView"
+        budget:
+          $ref: "#/components/schemas/SupervisionBudgetView"
+        authority:
+          $ref: "#/components/schemas/SupervisionAuthorityView"
+        effects:
+          type: array
+          items:
+            $ref: "#/components/schemas/EffectView"
+        blockedReasons:
+          type: array
+          items:
+            type: string
+        projectState:
+          $ref: "#/components/schemas/ProjectState"
+        projectVersion:
+          type: integer
+          minimum: 1
+    SupervisionBudgetView:
+      type: object
+      additionalProperties: false
+      required: [invocationLimit, consumedInvocations, monetaryLimitMicros, consumedMonetaryMicros]
+      properties:
+        invocationLimit:
+          type: integer
+          minimum: 0
+        consumedInvocations:
+          type: integer
+          minimum: 0
+        monetaryLimitMicros:
+          type: integer
+          minimum: 0
+        consumedMonetaryMicros:
+          type: integer
+          minimum: 0
+    SupervisionAuthorityView:
+      type: object
+      additionalProperties: false
+      required: [executionId, executionAttempt, executionState, capabilityLeaseId, capabilityLeaseState, capabilityLeaseExpiresAt, runnerLeaseId, runnerLeaseState, runnerLeaseExpiresAt, fencingToken, successor]
+      properties:
+        executionId:
+          type: string
+          format: uuid
+        executionAttempt:
+          type: integer
+          minimum: 1
+        executionState:
+          $ref: "#/components/schemas/ExecutionState"
+        capabilityLeaseId:
+          type: string
+          format: uuid
+        capabilityLeaseState:
+          type: string
+          enum: [ACTIVE, SUSPENDED, REVOKED]
+        capabilityLeaseExpiresAt:
+          type: string
+          format: date-time
+        runnerLeaseId:
+          type: string
+          format: uuid
+        runnerLeaseState:
+          type: string
+          enum: [ACTIVE, REVOKED]
+        runnerLeaseExpiresAt:
+          type: string
+          format: date-time
+        fencingToken:
+          type: integer
+          minimum: 1
+          maximum: 9007199254740991
+        successor:
+          type: boolean
     ResultView:
       type: object
       additionalProperties: false
@@ -957,7 +1068,7 @@ components:
     EffectView:
       type: object
       additionalProperties: false
-      required: [effectId, taskId, actionDigest, semanticKey, state]
+      required: [effectId, taskId, actionDigest, semanticKey, state, reconciliationOutcome, groundTruthDigest, version]
       properties:
         effectId:
           type: string
@@ -977,6 +1088,14 @@ components:
           oneOf:
             - type: string
             - type: "null"
+        groundTruthDigest:
+          oneOf:
+            - type: string
+              pattern: "^sha256:[a-f0-9]{64}$"
+            - type: "null"
+        version:
+          type: integer
+          minimum: 1
     OrganizationLineageView:
       type: object
       additionalProperties: false

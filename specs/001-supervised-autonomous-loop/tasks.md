@@ -113,19 +113,19 @@ safe boundary.
 
 ### Tests for User Story 2
 
-- [ ] T036 [P] [US2] Add policy and domain tests for tool grants, immutable action digests, supervisor-only decisions, expiry, self-approval denial, budget exhaustion, the serialized in-flight verification pause boundary, and distinct pause/stop/cancel state, lease, approval, recovery, and idempotency semantics in `packages/policy/src/supervision.test.ts`
-- [ ] T037 [P] [US2] Add API contract tests for approval list/item ETag acquisition and concurrent decision plus pause, resume, cancel, and stop preconditions, idempotency, authorization, and conflict outcomes in `tests/contract/supervision-api.test.ts`
-- [ ] T038 [P] [US2] Add integration tests for approval-before-effect, concurrent decisions, tamper rejection, pause preservation, in-flight verification finishing only during PAUSING or becoming STALE before PAUSED, deferred Project completion until resume, stop revocation, terminal cancel, resume with fresh authority, and stop/cancel/completion races with auditable outcomes in `tests/integration/supervision.test.ts`
-- [ ] T039 [P] [US2] Add browser acceptance for approve, reject, expiry, pause/resume, recoverable stop/resume, terminal cancel, budget, and blocked states in `tests/acceptance/supervise.spec.ts`
+- [x] T036 [P] [US2] Add policy and domain tests for tool grants, immutable action digests, supervisor-only decisions, expiry, self-approval denial, budget exhaustion, the serialized in-flight verification pause boundary, and distinct pause/stop/cancel state, lease, approval, recovery, and idempotency semantics in `packages/policy/src/supervision.test.ts`
+- [x] T037 [P] [US2] Add API contract tests for approval list/item ETag acquisition and concurrent decision plus pause, resume, cancel, and stop preconditions, idempotency, authorization, and conflict outcomes in `tests/contract/supervision-api.test.ts`
+- [x] T038 [P] [US2] Add integration tests for approval-before-effect, concurrent decisions, tamper rejection, pause preservation, in-flight verification finishing only during PAUSING or becoming STALE before PAUSED, deferred Project completion until resume, stop revocation, terminal cancel, resume with fresh authority, and stop/cancel/completion races with auditable outcomes in `tests/integration/supervision.test.ts`
+- [x] T039 [P] [US2] Add browser acceptance for approve, reject, expiry, pause/resume, recoverable stop/resume, terminal cancel, budget, and blocked states in `tests/acceptance/supervise.spec.ts`
 
 ### Implementation for User Story 2
 
-- [ ] T040 [US2] Implement capability and budget lease evaluation plus durable tool intent and action-digest approval creation in `apps/control-plane/src/application/supervision/tool-policy.ts`
-- [ ] T041 [US2] Implement supervisor approval decisions, expiry handling, and the specified versioned pause/resume/stop/cancel transitions, including no-new-evaluation PAUSING interlock, bounded in-flight evaluation drain-or-stale behavior, successor-execution recovery, safe effect boundaries, approval disposition, and capability/runner revocation in `apps/control-plane/src/application/supervision/commands.ts`
-- [ ] T042 [US2] Implement approval and control HTTP routes with actor checks, expected versions, and idempotency in `apps/control-plane/src/http/supervision.ts`
-- [ ] T043 [US2] Implement runner-side approved fixture effect execution and queryable effect ledger in `apps/runner/src/fixture/effects.ts`
-- [ ] T044 [P] [US2] Implement Supervise approval detail, immutable action preview, capacity/budget display, and control feedback in `apps/web/src/features/supervise/`
-- [ ] T045 [US2] Emit and project exactly-once attributable policy, approval, control, tool-intent, attempt, and effect-result audit events in `apps/control-plane/src/projections/supervision-events.ts`
+- [x] T040 [US2] Implement capability and budget lease evaluation plus durable tool intent and action-digest approval creation in `apps/control-plane/src/application/supervision/tool-policy.ts`
+- [x] T041 [US2] Implement supervisor approval decisions, expiry handling, and the specified versioned pause/resume/stop/cancel transitions, including no-new-evaluation PAUSING interlock, bounded in-flight evaluation drain-or-stale behavior, successor-execution recovery, safe effect boundaries, approval disposition, and capability/runner revocation in `apps/control-plane/src/application/supervision/commands.ts`
+- [x] T042 [US2] Implement approval and control HTTP routes with actor checks, expected versions, and idempotency in `apps/control-plane/src/http/supervision.ts`
+- [x] T043 [US2] Implement runner-side approved fixture effect execution and queryable effect ledger in `apps/runner/src/fixture/effects.ts`
+- [x] T044 [P] [US2] Implement Supervise approval detail, immutable action preview, capacity/budget display, and control feedback in `apps/web/src/features/supervise/`
+- [x] T045 [US2] Emit and project exactly-once attributable policy, approval, control, tool-intent, attempt, and effect-result audit events in `apps/control-plane/src/projections/supervision-events.ts`
 - [ ] T046 [US2] Run the independent US2 tests and record approval, effect-ledger, stop-race, and audit evidence in `evidence/001-supervised-autonomous-loop/us2/manifest.json`
 
 **Checkpoint**: US2 is independently accepted; no sensitive fixture effect can precede a valid

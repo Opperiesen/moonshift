@@ -88,7 +88,12 @@ export type EventKind =
   | 'task.state_changed'
   | 'execution.state_changed'
   | 'backend.event_observed'
+  | 'tool.requested'
   | 'policy.decided'
+  | 'approval.requested'
+  | 'approval.decided'
+  | 'effect.state_changed'
+  | 'checkpoint.created'
   | 'audit.notice';
 
 export interface ProjectEvent {
@@ -104,7 +109,17 @@ export interface ProjectEvent {
     readonly lineageId?: string | null;
   };
   readonly aggregate: {
-    readonly type: 'PROJECT' | 'CHANNEL' | 'AGENT' | 'DELEGATION' | 'TASK' | 'EXECUTION';
+    readonly type:
+      | 'PROJECT'
+      | 'CHANNEL'
+      | 'AGENT'
+      | 'DELEGATION'
+      | 'TASK'
+      | 'EXECUTION'
+      | 'TOOL_INVOCATION'
+      | 'APPROVAL'
+      | 'EXTERNAL_EFFECT'
+      | 'CHECKPOINT';
     readonly id: string;
     readonly version: number;
   };
@@ -163,9 +178,109 @@ export interface ProjectOrganization {
   readonly delegation: CompleteDelegation;
 }
 
+export interface ApprovalProjection {
+  readonly approvalId: string;
+  readonly projectId: string;
+  readonly taskId: string;
+  readonly requesterAgentId: string;
+  readonly state: 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
+  readonly actionDigest: `sha256:${string}`;
+  readonly scope: string;
+  readonly reason: string;
+  readonly riskSummary: string;
+  readonly expiresAt: string;
+  readonly decidedAt: string | null;
+  readonly decisionActorId: string | null;
+  readonly version: number;
+  readonly usable: boolean;
+}
+
+export interface EffectProjection {
+  readonly effectId: string;
+  readonly taskId: string;
+  readonly actionDigest: `sha256:${string}`;
+  readonly semanticKey: string;
+  readonly state:
+    'REQUESTED' | 'EXECUTING' | 'APPLIED' | 'FAILED' | 'UNKNOWN' | 'RECONCILING' | 'RECONCILED';
+  readonly reconciliationOutcome: string | null;
+  readonly groundTruthDigest: `sha256:${string}` | null;
+  readonly version: number;
+}
+
+export interface SupervisionAuditProjection {
+  readonly auditEventId: string;
+  readonly sequence: number;
+  readonly actorType: 'SUPERVISOR' | 'SPECIALIST' | 'SYSTEM' | 'RUNNER';
+  readonly actorId: string;
+  readonly action: string;
+  readonly targetType: string;
+  readonly targetId: string;
+  readonly occurredAt: string;
+  readonly reason: string;
+  readonly outcome: string;
+  readonly correlationId: string;
+}
+
+export interface SupervisionRecord {
+  readonly action: {
+    readonly tool: 'FIXTURE_EFFECT';
+    readonly operation: 'WRITE_APPROVED_MARKER';
+    readonly resource: 'fixture:repository';
+    readonly arguments: { readonly path: 'approved-marker'; readonly value: string };
+  };
+  readonly toolInvocationId: string;
+  readonly toolInvocationState:
+    | 'NOT_REQUESTED'
+    | 'WAITING_FOR_APPROVAL'
+    | 'APPROVED'
+    | 'REJECTED'
+    | 'EXPIRED'
+    | 'CANCELLED'
+    | 'APPLIED';
+  readonly approvals: readonly ApprovalProjection[];
+  readonly effects: readonly EffectProjection[];
+  readonly budget: {
+    readonly invocationLimit: number;
+    readonly consumedInvocations: number;
+    readonly monetaryLimitMicros: number;
+    readonly consumedMonetaryMicros: number;
+  };
+  readonly authority: {
+    readonly executionId: string;
+    readonly executionAttempt: number;
+    readonly executionState: ExecutionState;
+    readonly capabilityLeaseId: string;
+    readonly capabilityLeaseState: 'ACTIVE' | 'SUSPENDED' | 'REVOKED';
+    readonly capabilityLeaseExpiresAt: string;
+    readonly runnerLeaseId: string;
+    readonly runnerLeaseState: 'ACTIVE' | 'REVOKED';
+    readonly runnerLeaseExpiresAt: string;
+    readonly fencingToken: number;
+    readonly successor: boolean;
+  };
+  readonly checkpoint: {
+    readonly checkpointId: string;
+    readonly executionId: string;
+    readonly contentHash: `sha256:${string}`;
+    readonly gitRevision: string;
+    readonly createdAt: string;
+  } | null;
+  readonly verification: {
+    readonly state: 'NONE' | 'EVALUATING' | 'STALE';
+  };
+  readonly blockedReasons: readonly string[];
+  readonly audit: readonly SupervisionAuditProjection[];
+}
+
+export interface SupervisionProjection extends SupervisionRecord {
+  readonly projectState: ProjectState;
+  readonly projectVersion: number;
+}
+
 export interface ProjectRecord {
   readonly view: ProjectView;
   readonly organization: ProjectOrganization;
   readonly scheduling: SchedulingResult;
+  readonly supervision: SupervisionRecord;
   readonly events: readonly ProjectEvent[];
 }

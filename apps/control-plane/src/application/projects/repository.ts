@@ -28,10 +28,30 @@ export interface ProjectCapacitySnapshot {
 
 export interface ProjectRepository {
   create(input: CreateProjectRecordInput): Promise<{ reused: boolean; record: ProjectRecord }>;
+  authorityNow(): Promise<string>;
   get(projectId: string): Promise<ProjectRecord | null>;
   listEvents(projectId: string, afterSequence: number): Promise<readonly ProjectEvent[]>;
   expireEventsBefore(projectId: string, sequence: number): Promise<void>;
   assertVersion(projectId: string, expectedVersion: number): Promise<void>;
+  mutate<T>(input: MutateProjectRecordInput<T>): Promise<{
+    readonly reused: boolean;
+    readonly response: T;
+    readonly record: ProjectRecord;
+  }>;
+}
+
+export interface MutateProjectRecordInput<T> {
+  readonly scope: string;
+  readonly idempotencyKey: string;
+  readonly requestHash: `sha256:${string}`;
+  readonly projectId: string;
+  readonly reserveCognitiveCapacity?: boolean;
+  readonly reserveRunnerCapacity?: boolean;
+  readonly mutate: (
+    record: ProjectRecord,
+    authorityNow: string,
+    capacity?: ProjectCapacitySnapshot,
+  ) => Promise<{ readonly record: ProjectRecord; readonly response: T }>;
 }
 
 export function projectRequestHash(input: {
@@ -45,6 +65,13 @@ export function projectRequestHash(input: {
   return `sha256:${createHash('sha256').update(canonical).digest('hex')}`;
 }
 
+export function commandRequestHash(input: Readonly<Record<string, unknown>>): `sha256:${string}` {
+  const canonical = JSON.stringify(
+    Object.fromEntries(Object.entries(input).sort(([left], [right]) => left.localeCompare(right))),
+  );
+  return `sha256:${createHash('sha256').update(canonical).digest('hex')}`;
+}
+
 export class InMemoryProjectRepository implements ProjectRepository {
   private readonly projects = new Map<string, ProjectRecord>();
   private readonly idempotency = new Map<
@@ -52,16 +79,48 @@ export class InMemoryProjectRepository implements ProjectRepository {
     { readonly requestHash: string; readonly projectId: string }
   >();
   private readonly retainedFrom = new Map<string, number>();
-  private creationQueue: Promise<void> = Promise.resolve();
+  private readonly commandIdempotency = new Map<
+    string,
+    { readonly requestHash: string; readonly response: unknown }
+  >();
+  private operationQueue: Promise<void> = Promise.resolve();
 
   constructor(private readonly authorityClock: () => Date = () => new Date()) {}
+
+  async authorityNow(): Promise<string> {
+    return this.authorityClock().toISOString();
+  }
+
+  private capacitySnapshot(authorityNow: string): ProjectCapacitySnapshot {
+    const records = [...this.projects.values()];
+    return Object.freeze({
+      activeSpecialists: records.reduce(
+        (total, project) =>
+          total + project.view.specialists.filter(({ status }) => status === 'ACTIVE').length,
+        0,
+      ),
+      activeCognitiveRuns: records.filter((project) =>
+        ['STARTING', 'RUNNING', 'WAITING_FOR_APPROVAL', 'CHECKPOINTING'].includes(
+          project.supervision.authority.executionState,
+        ),
+      ).length,
+      activeRunnerJobs: records.filter(
+        (project) =>
+          project.scheduling.runtime.status === 'RUNNING' ||
+          project.supervision.effects.some(({ state }) =>
+            ['EXECUTING', 'UNKNOWN', 'RECONCILING'].includes(state),
+          ),
+      ).length,
+      authorityNow,
+    });
+  }
 
   async create(
     input: CreateProjectRecordInput,
   ): Promise<{ reused: boolean; record: ProjectRecord }> {
-    const previous = this.creationQueue;
+    const previous = this.operationQueue;
     let release = (): void => undefined;
-    this.creationQueue = new Promise<void>((resolve) => {
+    this.operationQueue = new Promise<void>((resolve) => {
       release = resolve;
     });
     await previous;
@@ -87,20 +146,7 @@ export class InMemoryProjectRepository implements ProjectRepository {
       if (record === undefined) throw new Error('Idempotency record has no project');
       return { reused: true, record };
     }
-    const records = [...this.projects.values()];
-    const record = await input.build({
-      activeSpecialists: records.reduce(
-        (total, project) =>
-          total + project.view.specialists.filter(({ status }) => status === 'ACTIVE').length,
-        0,
-      ),
-      activeCognitiveRuns: records.filter(
-        (project) => project.scheduling.execution.state === 'WAITING_FOR_APPROVAL',
-      ).length,
-      activeRunnerJobs: records.filter((project) => project.scheduling.runtime.status === 'RUNNING')
-        .length,
-      authorityNow: this.authorityClock().toISOString(),
-    });
+    const record = await input.build(this.capacitySnapshot(this.authorityClock().toISOString()));
     const projectId = record.view.projectId;
     if (this.projects.has(projectId)) throw new Error('Project identity already exists');
     this.projects.set(projectId, record);
@@ -142,6 +188,58 @@ export class InMemoryProjectRepository implements ProjectRepository {
       throw new ControlPlaneError('PROJECT_NOT_FOUND', 'Project not found', 404);
     if (current !== expectedVersion)
       throw new ProjectVersionConflictError(expectedVersion, current);
+  }
+
+  async mutate<T>(input: MutateProjectRecordInput<T>): Promise<{
+    readonly reused: boolean;
+    readonly response: T;
+    readonly record: ProjectRecord;
+  }> {
+    const previous = this.operationQueue;
+    let release = (): void => undefined;
+    this.operationQueue = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await previous;
+    try {
+      const key = `${input.scope}:${input.idempotencyKey}`;
+      const prior = this.commandIdempotency.get(key);
+      const current = this.projects.get(input.projectId);
+      if (current === undefined)
+        throw new ControlPlaneError('PROJECT_NOT_FOUND', 'Project not found', 404);
+      if (prior !== undefined) {
+        if (prior.requestHash !== input.requestHash)
+          throw new ControlPlaneError(
+            'IDEMPOTENCY_CONFLICT',
+            'The idempotency key belongs to another request',
+            409,
+          );
+        return { reused: true, response: prior.response as T, record: current };
+      }
+      const authorityNow = this.authorityClock().toISOString();
+      const changed = await input.mutate(
+        current,
+        authorityNow,
+        input.reserveCognitiveCapacity || input.reserveRunnerCapacity
+          ? this.capacitySnapshot(authorityNow)
+          : undefined,
+      );
+      if (
+        changed.record.view.projectId !== input.projectId ||
+        changed.record.view.version !== current.view.version + 1 ||
+        changed.record.view.lastSequence < current.view.lastSequence
+      ) {
+        throw new Error('Project mutation did not preserve identity and monotonic versions');
+      }
+      this.projects.set(input.projectId, changed.record);
+      this.commandIdempotency.set(key, {
+        requestHash: input.requestHash,
+        response: changed.response,
+      });
+      return { reused: false, response: changed.response, record: changed.record };
+    } finally {
+      release();
+    }
   }
 
   expireBefore(projectId: string, sequence: number): void {
@@ -194,7 +292,7 @@ export class InMemoryProjectRepository implements ProjectRepository {
       projectId,
       sequence,
       kind: 'audit.notice',
-      occurredAt: new Date().toISOString(),
+      occurredAt: this.authorityClock().toISOString(),
       actor: Object.freeze({ type: 'SYSTEM', id: randomUUID() }),
       aggregate: Object.freeze({ type: 'PROJECT', id: projectId, version: record.view.version }),
       correlationId: record.events[0]?.correlationId ?? randomUUID(),
@@ -223,6 +321,7 @@ export class InMemoryProjectRepository implements ProjectRepository {
   clear(): void {
     this.projects.clear();
     this.idempotency.clear();
+    this.commandIdempotency.clear();
     this.retainedFrom.clear();
   }
 }

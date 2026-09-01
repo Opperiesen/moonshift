@@ -62,17 +62,23 @@ the JSON boundary could not represent exactly.
 Accepted fixture lease offers and their monotonically increasing execution fences are committed to
 the same durable runner snapshot as their processed message IDs. Restart reconstructs both current
 lease authority and the highest fence per execution, so a superseded fence cannot regain authority
-through a new message ID. Certificate revocation atomically marks every persisted runner lease
-revoked as well as recording the certificate serial; another enrolled certificate therefore cannot
-revive pre-revocation authority after restart. Revocation fences leases, aborts work, and closes the
-streams before persistence, durably disables the Runner, and requires explicit enrollment of a new
-certificate to reactivate it. A pending-revocation marker preserves that disabled state across restart
-even if the main snapshot fails before rename; configured bootstrap enrollments cannot silently
-reactivate it. Independently, the daemon durably creates an active-runtime guard before accepting any
-authority and removes it only after a proven clean shutdown. Its presence on startup proves that the
-prior runtime ended ambiguously, so even rollback of both the main snapshot and an unsynced pending
-marker remains fail-closed. On a persistence failure, the live daemon quarantines all authority and
-stops accepting connections instead of continuing with an unconfirmed revocation.
+through a new message ID. A cancellation received before its lease offer is durably retained as the
+highest revoked authority for that execution; the delayed offer and every same-or-lower fence remain
+invalid across restart, while only a strictly higher successor can replace the cancellation fence.
+Each offer also carries the PostgreSQL-authoritative `authorizedAt` claim timestamp and both approval
+and lease expiries. The authenticated runner validates that the durable claim preceded both expiries;
+client and runner host clocks cannot extend or prematurely expire that already-serialized claim.
+Certificate revocation atomically marks every persisted runner lease revoked as well as recording the
+certificate serial; another enrolled certificate therefore cannot revive pre-revocation authority
+after restart. Revocation fences leases, aborts work, and closes the streams before persistence,
+durably disables the Runner, and requires explicit enrollment of a new certificate to reactivate it.
+A pending-revocation marker preserves that disabled state across restart even if the main snapshot
+fails before rename; configured bootstrap enrollments cannot silently reactivate it. Independently,
+the daemon durably creates an active-runtime guard before accepting any authority and removes it only
+after a proven clean shutdown. Its presence on startup proves that the prior runtime ended
+ambiguously, so even rollback of both the main snapshot and an unsynced pending marker remains
+fail-closed. On a persistence failure, the live daemon quarantines all authority and stops accepting
+connections instead of continuing with an unconfirmed revocation.
 
 The fixture runner journal fsyncs a complete temporary snapshot before atomic rename and fsyncs its
 owner-only parent directory before acknowledging the write. A failed pre-rename persistence barrier

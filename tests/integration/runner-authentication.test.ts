@@ -29,6 +29,7 @@ import {
   FixtureRunnerServer,
   evaluateFixtureEligibility,
   fixtureRuntimeDiscovery,
+  hasExclusiveRunnerIdentity,
   readOwnedTlsMaterial,
 } from '../../apps/runner/src/index.js';
 
@@ -41,6 +42,7 @@ const runnerId = uuid(2);
 const goodSerial = '1001';
 const enrolledSerial = '1002';
 const runnerPeerSerial = '1003';
+const mixedRoleSerial = '1004';
 const runnerCertificateSerial = '1100';
 const hash = `sha256:${'a'.repeat(64)}`;
 
@@ -57,6 +59,8 @@ type Certificates = {
   enrolledClientKey: Buffer;
   runnerClientCert: Buffer;
   runnerClientKey: Buffer;
+  mixedRoleClientCert: Buffer;
+  mixedRoleClientKey: Buffer;
   rogueCa: Buffer;
   rogueClientCert: Buffer;
   rogueClientKey: Buffer;
@@ -172,6 +176,12 @@ async function createCertificates(): Promise<Certificates> {
     `0x${runnerPeerSerial}`,
     `basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=clientAuth\nsubjectAltName=URI:urn:moonshift:runner:${runnerId}`,
   );
+  await leaf(
+    'mixed-role-client',
+    'ca',
+    `0x${mixedRoleSerial}`,
+    `basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature\nextendedKeyUsage=clientAuth\nsubjectAltName=URI:urn:moonshift:instance:${instanceId},URI:urn:moonshift:auditor:${uuid(998)}`,
+  );
   await ca('rogue-ca', '/CN=Rogue Test CA', '0x2000');
   await leaf(
     'rogue-client',
@@ -193,6 +203,8 @@ async function createCertificates(): Promise<Certificates> {
     enrolledClientKey: await readFile(join(root, 'enrolled-client.key')),
     runnerClientCert: await readFile(join(root, 'runner-client.crt')),
     runnerClientKey: await readFile(join(root, 'runner-client.key')),
+    mixedRoleClientCert: await readFile(join(root, 'mixed-role-client.crt')),
+    mixedRoleClientKey: await readFile(join(root, 'mixed-role-client.key')),
     rogueCa: await readFile(join(root, 'rogue-ca.crt')),
     rogueClientCert: await readFile(join(root, 'rogue-client.crt')),
     rogueClientKey: await readFile(join(root, 'rogue-client.key')),
@@ -227,6 +239,10 @@ function leaseOffer(messageId = uuid(11)) {
     leaseId: uuid(12),
     executionId: uuid(13),
     fencingToken: 1,
+    effectId: uuid(15),
+    actionDigest: hash,
+    authorizedAt: now.toISOString(),
+    approvalExpiresAt: new Date(now.getTime() + 60_000).toISOString(),
     expiresAt: new Date(now.getTime() + 60_000).toISOString(),
     resources: resourceRequest,
   };
@@ -248,7 +264,7 @@ function fixtureCommand(messageId = uuid(14)) {
 async function connect(
   port: number,
   certificates: Certificates,
-  identity: 'primary' | 'enrolled' | 'runner' | 'rogue' = 'primary',
+  identity: 'primary' | 'enrolled' | 'runner' | 'mixed' | 'rogue' = 'primary',
 ): Promise<TLSSocket> {
   const socket = connectTls({
     host: '127.0.0.1',
@@ -259,17 +275,21 @@ async function connect(
         ? certificates.rogueClientCert
         : identity === 'runner'
           ? certificates.runnerClientCert
-          : identity === 'enrolled'
-            ? certificates.enrolledClientCert
-            : certificates.clientCert,
+          : identity === 'mixed'
+            ? certificates.mixedRoleClientCert
+            : identity === 'enrolled'
+              ? certificates.enrolledClientCert
+              : certificates.clientCert,
     key:
       identity === 'rogue'
         ? certificates.rogueClientKey
         : identity === 'runner'
           ? certificates.runnerClientKey
-          : identity === 'enrolled'
-            ? certificates.enrolledClientKey
-            : certificates.clientKey,
+          : identity === 'mixed'
+            ? certificates.mixedRoleClientKey
+            : identity === 'enrolled'
+              ? certificates.enrolledClientKey
+              : certificates.clientKey,
     minVersion: 'TLSv1.3',
     maxVersion: 'TLSv1.3',
     rejectUnauthorized: true,
@@ -394,7 +414,10 @@ describe.sequential('fixture runner authenticated boundary', () => {
       runnerId,
       stateDirectory: join(certificates.root, 'main-runner-state'),
       tls: { ca: certificates.ca, cert: certificates.serverCert, key: certificates.serverKey },
-      controlPlaneEnrollments: [{ serialNumber: goodSerial, instanceId }],
+      controlPlaneEnrollments: [
+        { serialNumber: goodSerial, instanceId },
+        { serialNumber: mixedRoleSerial, instanceId },
+      ],
       now: () => now,
     });
     ({ port } = await runner.listen());
@@ -461,19 +484,31 @@ describe.sequential('fixture runner authenticated boundary', () => {
     expect(fileSystem.existsSync(stateDirectory)).toBe(false);
   });
 
+  it('accepts only one exclusive Moonshift runner URI on the authenticated peer', () => {
+    expect(hasExclusiveRunnerIdentity(`URI:urn:moonshift:runner:${runnerId}`, runnerId)).toBe(true);
+    expect(
+      hasExclusiveRunnerIdentity(
+        `URI:urn:moonshift:runner:${runnerId}, URI:urn:moonshift:instance:${instanceId}`,
+        runnerId,
+      ),
+    ).toBe(false);
+    expect(
+      hasExclusiveRunnerIdentity(
+        `URI:urn:moonshift:runner:${runnerId}, URI:urn:moonshift:runner:${uuid(999)}`,
+        runnerId,
+      ),
+    ).toBe(false);
+  });
+
   it('supersedes stale execution leases only with a strictly higher fencing token', () => {
     const registry = new FixtureLeaseRegistry();
     const first = { ...leaseOffer(uuid(61)), leaseId: uuid(62), executionId: uuid(63) };
     const second = { ...first, leaseId: uuid(64), fencingToken: 2 };
-    registry.offer(first, runnerId, now);
-    registry.offer(second, runnerId, now);
-    expect(registry.isCurrent(first.leaseId, first.executionId, first.fencingToken, now)).toBe(
-      false,
-    );
-    expect(registry.isCurrent(second.leaseId, second.executionId, second.fencingToken, now)).toBe(
-      true,
-    );
-    expect(() => registry.offer({ ...first, leaseId: uuid(65) }, runnerId, now)).toThrow(
+    registry.offer(first, runnerId);
+    registry.offer(second, runnerId);
+    expect(registry.isCurrent(first.leaseId, first.executionId, first.fencingToken)).toBe(false);
+    expect(registry.isCurrent(second.leaseId, second.executionId, second.fencingToken)).toBe(true);
+    expect(() => registry.offer({ ...first, leaseId: uuid(65) }, runnerId)).toThrow(
       'not monotonic',
     );
     expect(() =>
@@ -485,7 +520,6 @@ describe.sequential('fixture runner authenticated boundary', () => {
           fencingToken: Number.MAX_SAFE_INTEGER + 1,
         },
         runnerId,
-        now,
       ),
     ).toThrow('positive safe integer');
   });
@@ -501,9 +535,61 @@ describe.sequential('fixture runner authenticated boundary', () => {
         fencingToken: Number.MAX_SAFE_INTEGER + 1,
         runnerId,
         revoked: false,
+        consumed: false,
       }),
     ).toThrow('positive safe integer');
     expect(new FixtureRunnerJournal(stateDirectory).leaseOffers).toEqual([]);
+  });
+
+  it('persists a cancellation fence before its lease offer and rejects that offer after restart', () => {
+    const stateDirectory = join(certificates.root, 'preemptive-cancel-journal-state');
+    const authority = {
+      leaseId: uuid(158),
+      executionId: uuid(159),
+      fencingToken: 1,
+    };
+    const journal = new FixtureRunnerJournal(stateDirectory);
+    journal.recordLeaseRevocationAndMessage(uuid(160), authority);
+    expect(journal.leaseOffers).toEqual([]);
+    expect(journal.revokedLeaseAuthorities).toEqual([authority]);
+
+    const restarted = new FixtureRunnerJournal(stateDirectory);
+    const registry = new FixtureLeaseRegistry(
+      restarted.leaseOffers,
+      restarted.revokedLeaseAuthorities,
+    );
+    const staleOffer = {
+      ...leaseOffer(uuid(161)),
+      ...authority,
+      effectId: uuid(162),
+    };
+    expect(() => registry.offer(staleOffer, runnerId)).toThrow('not monotonic');
+    expect(() =>
+      restarted.recordLeaseAndMessage(uuid(163), {
+        ...staleOffer,
+        runnerId,
+        revoked: false,
+        consumed: false,
+      }),
+    ).toThrow('not monotonic');
+    expect(restarted.hasProcessed(uuid(163))).toBe(false);
+
+    const successor = { ...staleOffer, leaseId: uuid(164), fencingToken: 2 };
+    restarted.recordLeaseAndMessage(uuid(165), {
+      leaseId: successor.leaseId,
+      executionId: successor.executionId,
+      fencingToken: successor.fencingToken,
+      effectId: successor.effectId,
+      actionDigest: successor.actionDigest,
+      authorizedAt: successor.authorizedAt,
+      approvalExpiresAt: successor.approvalExpiresAt,
+      expiresAt: successor.expiresAt,
+      resources: successor.resources,
+      runnerId,
+      revoked: false,
+      consumed: false,
+    });
+    expect(new FixtureRunnerJournal(stateDirectory).revokedLeaseAuthorities).toEqual([]);
   });
 
   it('runs the authenticated daemon separately and refuses scheduling without hard isolation', async () => {
@@ -683,11 +769,11 @@ describe.sequential('fixture runner authenticated boundary', () => {
     const executor = new FixtureProcessExecutor(ledger, journal);
     const offer = leaseOffer();
     const registry = new FixtureLeaseRegistry();
-    registry.offer(offer, runnerId, now);
+    registry.offer(offer, runnerId);
     const command = fixtureCommand();
-    expect(
-      registry.isCurrent(command.leaseId, command.executionId, command.fencingToken, now),
-    ).toBe(true);
+    expect(registry.isCurrent(command.leaseId, command.executionId, command.fencingToken)).toBe(
+      true,
+    );
     await expect(
       executor.run(command, {
         memoryBytes: resourceRequest.memoryBytes,
@@ -734,6 +820,7 @@ describe.sequential('fixture runner authenticated boundary', () => {
       ...leaseOffer(uuid(133)),
       leaseId: uuid(134),
       executionId: uuid(135),
+      effectId: uuid(139),
     };
     const secondLease = {
       ...firstLease,
@@ -788,6 +875,101 @@ describe.sequential('fixture runner authenticated boundary', () => {
     }
   });
 
+  it('binds each lease to one effect and rejects a second effect under the consumed authority', async () => {
+    const stateDirectory = join(certificates.root, 'single-effect-lease-state');
+    const singleEffectServer = new FixtureRunnerServer({
+      instanceId,
+      runnerId,
+      stateDirectory,
+      tls: { ca: certificates.ca, cert: certificates.serverCert, key: certificates.serverKey },
+      controlPlaneEnrollments: [{ serialNumber: goodSerial, instanceId }],
+      now: () => now,
+      capacity: {
+        ...DEFAULT_FIXTURE_CAPACITY,
+        enforcement: {
+          cpu: true,
+          memory: true,
+          process: true,
+          disk: true,
+          time: true,
+          network: true,
+          gpu: true,
+        },
+      },
+    });
+    const address = await singleEffectServer.listen();
+    const firstCommand = {
+      ...fixtureCommand(uuid(152)),
+      leaseId: uuid(149),
+      executionId: uuid(150),
+      effectId: uuid(151),
+    };
+    const lease = {
+      ...leaseOffer(uuid(148)),
+      leaseId: firstCommand.leaseId,
+      executionId: firstCommand.executionId,
+      effectId: firstCommand.effectId,
+    };
+    const secondCommand = {
+      ...firstCommand,
+      messageId: uuid(153),
+      effectId: uuid(154),
+    };
+    const mismatchedCommand = {
+      ...firstCommand,
+      messageId: uuid(156),
+      actionDigest: `sha256:${'b'.repeat(64)}`,
+    };
+    const mismatchedSocket = await connect(address.port, certificates);
+    mismatchedSocket.write(`${JSON.stringify(lease)}\n`);
+    await singleEffectServer.waitForMessage(lease.messageId);
+    mismatchedSocket.write(`${JSON.stringify(mismatchedCommand)}\n`);
+    await waitForClose(mismatchedSocket);
+    const journalBeforeAuthorizedEffect = new FixtureRunnerJournal(stateDirectory);
+    expect(journalBeforeAuthorizedEffect.effects).toHaveLength(0);
+    expect(journalBeforeAuthorizedEffect.leaseOffers).toMatchObject([
+      {
+        leaseId: lease.leaseId,
+        effectId: lease.effectId,
+        actionDigest: lease.actionDigest,
+        consumed: false,
+      },
+    ]);
+    expect(journalBeforeAuthorizedEffect.hasProcessed(mismatchedCommand.messageId)).toBe(false);
+
+    const socket = await connect(address.port, certificates);
+    let received = '';
+    socket.on('data', (chunk: Buffer) => {
+      received += chunk.toString('utf8');
+    });
+    try {
+      socket.write(`${JSON.stringify(firstCommand)}\n`);
+      await singleEffectServer.waitForMessage(firstCommand.messageId);
+      await waitForCondition(() => received.includes(firstCommand.messageId));
+
+      socket.write(`${JSON.stringify(secondCommand)}\n`);
+      await waitForClose(socket);
+
+      expect(received).toContain(`\"operationMessageId\":\"${firstCommand.messageId}\"`);
+      expect(received).not.toContain(`\"operationMessageId\":\"${secondCommand.messageId}\"`);
+      const journal = new FixtureRunnerJournal(stateDirectory);
+      expect(journal.effects).toHaveLength(1);
+      expect(journal.effects[0]).toMatchObject({ effectId: firstCommand.effectId });
+      expect(journal.leaseOffers).toMatchObject([
+        {
+          leaseId: lease.leaseId,
+          effectId: firstCommand.effectId,
+          actionDigest: firstCommand.actionDigest,
+          consumed: true,
+        },
+      ]);
+      expect(journal.hasProcessed(secondCommand.messageId)).toBe(false);
+    } finally {
+      socket.destroy();
+      await singleEffectServer.close();
+    }
+  });
+
   it('aborts an in-flight fixture child and records no effect after lease authority is revoked', async () => {
     const stateDirectory = join(certificates.root, 'revoked-executor-state');
     const journal = new FixtureRunnerJournal(stateDirectory);
@@ -795,7 +977,7 @@ describe.sequential('fixture runner authenticated boundary', () => {
     const executor = new FixtureProcessExecutor(ledger, journal);
     const registry = new FixtureLeaseRegistry();
     const offer = leaseOffer(uuid(91));
-    registry.offer(offer, runnerId, now);
+    registry.offer(offer, runnerId);
     const command = fixtureCommand(uuid(92));
     const controller = new AbortController();
     const execution = executor.run(
@@ -807,7 +989,7 @@ describe.sequential('fixture runner authenticated boundary', () => {
       {
         signal: controller.signal,
         isCurrent: () =>
-          registry.isCurrent(command.leaseId, command.executionId, command.fencingToken, now),
+          registry.isCurrent(command.leaseId, command.executionId, command.fencingToken),
       },
     );
     expect(executor.lastProcessId).toEqual(expect.any(Number));
@@ -930,6 +1112,7 @@ describe.sequential('fixture runner authenticated boundary', () => {
       ...leaseOffer(uuid(121)),
       leaseId: uuid(122),
       executionId: uuid(123),
+      effectId: uuid(125),
     };
     socket.write(`${JSON.stringify(offer)}\n`);
     await quarantinedRunner.waitForMessage(offer.messageId);
@@ -956,7 +1139,6 @@ describe.sequential('fixture runner authenticated boundary', () => {
         offer.leaseId,
         offer.executionId,
         offer.fencingToken,
-        now,
       ),
     ).toBe(true);
 
@@ -1119,7 +1301,6 @@ describe.sequential('fixture runner authenticated boundary', () => {
           firstLease.leaseId,
           firstLease.executionId,
           firstLease.fencingToken,
-          now,
         ),
       ).toBe(false);
       expect(
@@ -1127,7 +1308,6 @@ describe.sequential('fixture runner authenticated boundary', () => {
           secondLease.leaseId,
           secondLease.executionId,
           secondLease.fencingToken,
-          now,
         ),
       ).toBe(true);
 
@@ -1201,12 +1381,7 @@ describe.sequential('fixture runner authenticated boundary', () => {
     try {
       expect(restarted.isAuthorityQuarantined).toBe(true);
       expect(
-        restarted.leaseRegistry.isCurrent(
-          lease.leaseId,
-          lease.executionId,
-          lease.fencingToken,
-          now,
-        ),
+        restarted.leaseRegistry.isCurrent(lease.leaseId, lease.executionId, lease.fencingToken),
       ).toBe(false);
       const revokedIdentity = await connect(restartedAddress.port, certificates);
       await waitForClose(revokedIdentity);
@@ -1243,6 +1418,14 @@ describe.sequential('fixture runner authenticated boundary', () => {
     runnerPeer.write(`${JSON.stringify(leaseOffer(uuid(22)))}\n`);
     runnerPeer.write(`${JSON.stringify(fixtureCommand(uuid(23)))}\n`);
     await waitForClose(runnerPeer);
+    expect(runner.metrics.handledMessages).toBe(handledBefore);
+  });
+
+  it('rejects an enrolled certificate carrying the expected instance URI plus another Moonshift URI', async () => {
+    const handledBefore = runner.metrics.handledMessages;
+    const mixedRolePeer = await connect(port, certificates, 'mixed');
+    mixedRolePeer.write(`${JSON.stringify(leaseOffer(uuid(155)))}\n`);
+    await waitForClose(mixedRolePeer);
     expect(runner.metrics.handledMessages).toBe(handledBefore);
   });
 
@@ -1507,24 +1690,29 @@ describe.sequential('fixture runner authenticated boundary', () => {
     }
   });
 
-  it('rejects invalid and already-expired lease offers and uses the injected clock', () => {
+  it('accepts only database-authorized lease proofs without consulting a runner clock', () => {
     const registry = new FixtureLeaseRegistry();
     const invalid = { ...leaseOffer(uuid(104)), expiresAt: 'not-a-timestamp' };
-    expect(() => registry.offer(invalid, runnerId, now)).toThrow('Invalid lease expiry timestamp');
+    expect(() => registry.offer(invalid, runnerId)).toThrow('Invalid lease authority timestamp');
     expect(() =>
-      registry.offer({ ...invalid, expiresAt: now.toISOString() }, runnerId, now),
-    ).toThrow('already expired');
-    const advancing = { ...leaseOffer(uuid(105)), expiresAt: now.toISOString() };
-    const later = new Date(now.getTime() - 1);
-    registry.offer(advancing, runnerId, later);
-    expect(registry.isCurrent(advancing.leaseId, advancing.executionId, 1, now)).toBe(false);
+      registry.offer(
+        {
+          ...leaseOffer(uuid(105)),
+          authorizedAt: new Date(now.getTime() + 60_000).toISOString(),
+        },
+        runnerId,
+      ),
+    ).toThrow('not authorized before approval and authority expiry');
+    const authorized = leaseOffer(uuid(106));
+    registry.offer(authorized, runnerId);
+    expect(registry.isCurrent(authorized.leaseId, authorized.executionId, 1)).toBe(true);
   });
 
   it('rejects a result operation bound to a stale fencing token', async () => {
     const registry = new FixtureLeaseRegistry();
     const offer = leaseOffer(uuid(35));
-    registry.offer(offer, runnerId, now);
-    expect(registry.isCurrent(offer.leaseId, offer.executionId, offer.fencingToken + 1, now)).toBe(
+    registry.offer(offer, runnerId);
+    expect(registry.isCurrent(offer.leaseId, offer.executionId, offer.fencingToken + 1)).toBe(
       false,
     );
   });
@@ -1532,14 +1720,14 @@ describe.sequential('fixture runner authenticated boundary', () => {
   it('closes authenticated streams and fences their leases on revocation', async () => {
     const socket = await connect(port, certificates);
     const offer = leaseOffer(uuid(41));
-    runner.leaseRegistry.offer(offer, runnerId, now);
+    runner.leaseRegistry.offer(offer, runnerId);
     expect(
-      runner.leaseRegistry.isCurrent(offer.leaseId, offer.executionId, offer.fencingToken, now),
+      runner.leaseRegistry.isCurrent(offer.leaseId, offer.executionId, offer.fencingToken),
     ).toBe(true);
     await runner.revokeControlPlaneCertificate(goodSerial);
     await waitForClose(socket);
     expect(
-      runner.leaseRegistry.isCurrent(offer.leaseId, offer.executionId, offer.fencingToken, now),
+      runner.leaseRegistry.isCurrent(offer.leaseId, offer.executionId, offer.fencingToken),
     ).toBe(false);
     const rejected = await connect(port, certificates);
     await waitForClose(rejected);

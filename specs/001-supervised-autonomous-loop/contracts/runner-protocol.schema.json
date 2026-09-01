@@ -139,7 +139,8 @@
       "additionalProperties": false,
       "required": [
         "schemaVersion", "messageId", "kind", "instanceId", "runnerId", "correlationId", "sentAt",
-        "leaseId", "executionId", "fencingToken", "expiresAt", "resources"
+        "leaseId", "executionId", "fencingToken", "effectId", "actionDigest", "authorizedAt",
+        "approvalExpiresAt", "expiresAt", "resources"
       ],
       "properties": {
         "schemaVersion": { "const": "1.0" },
@@ -152,6 +153,10 @@
         "leaseId": { "$ref": "#/$defs/uuid" },
         "executionId": { "$ref": "#/$defs/uuid" },
         "fencingToken": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+        "effectId": { "$ref": "#/$defs/uuid" },
+        "actionDigest": { "$ref": "#/$defs/sha256" },
+        "authorizedAt": { "type": "string", "format": "date-time" },
+        "approvalExpiresAt": { "type": "string", "format": "date-time" },
         "expiresAt": { "type": "string", "format": "date-time" },
         "resources": { "$ref": "#/$defs/resourceRequest" }
       }
@@ -205,7 +210,7 @@
       "additionalProperties": false,
       "required": [
         "schemaVersion", "messageId", "kind", "instanceId", "runnerId", "correlationId", "sentAt",
-        "effectId", "actionDigest"
+        "effectId", "actionDigest", "leaseId", "executionId", "fencingToken"
       ],
       "properties": {
         "schemaVersion": { "const": "1.0" },
@@ -216,7 +221,10 @@
         "correlationId": { "$ref": "#/$defs/uuid" },
         "sentAt": { "type": "string", "format": "date-time" },
         "effectId": { "$ref": "#/$defs/uuid" },
-        "actionDigest": { "$ref": "#/$defs/sha256" }
+        "actionDigest": { "$ref": "#/$defs/sha256" },
+        "leaseId": { "$ref": "#/$defs/uuid" },
+        "executionId": { "$ref": "#/$defs/uuid" },
+        "fencingToken": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 }
       }
     },
     "result": {

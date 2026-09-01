@@ -20,7 +20,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { isRfc3339DateTime, isUuid } from '@moonshift/contracts';
 
 import type { FixtureEffectRecord } from './fixture-executor.js';
-import type { DurableFixtureLeaseRecord } from './leases.js';
+import type { DurableFixtureLeaseRecord, FixtureLeaseFence } from './leases.js';
 import type { ControlPlaneEnrollment } from './server.js';
 
 export type DurableFixtureEffectRecord = FixtureEffectRecord & {
@@ -38,6 +38,7 @@ type RunnerSnapshot = {
   readonly processedMessageIds: readonly string[];
   readonly effects: readonly DurableFixtureEffectRecord[];
   readonly leaseOffers: readonly DurableFixtureLeaseRecord[];
+  readonly revokedLeaseAuthorities: readonly FixtureLeaseFence[];
 };
 
 const EMPTY_SNAPSHOT: RunnerSnapshot = Object.freeze({
@@ -48,6 +49,7 @@ const EMPTY_SNAPSHOT: RunnerSnapshot = Object.freeze({
   processedMessageIds: [],
   effects: [],
   leaseOffers: [],
+  revokedLeaseAuthorities: [],
 });
 
 export type RunnerJournalFileSystem = {
@@ -172,7 +174,8 @@ function assertSnapshot(value: unknown): asserts value is RunnerSnapshot {
     !Array.isArray(snapshot.processedMessageIds) ||
     !snapshot.processedMessageIds.every((messageId) => typeof messageId === 'string') ||
     !Array.isArray(snapshot.effects) ||
-    !Array.isArray(snapshot.leaseOffers)
+    !Array.isArray(snapshot.leaseOffers) ||
+    !Array.isArray(snapshot.revokedLeaseAuthorities)
   ) {
     throw new Error('Invalid runner journal');
   }
@@ -204,7 +207,7 @@ function assertSnapshot(value: unknown): asserts value is RunnerSnapshot {
     }
   }
   const leaseIds = new Set<string>();
-  const highestFenceByExecution = new Map<string, number>();
+  const highestLeaseByExecution = new Map<string, DurableFixtureLeaseRecord>();
   for (const lease of snapshot.leaseOffers) {
     const resourceKeys =
       lease !== null && typeof lease === 'object' && lease.resources !== null
@@ -214,13 +217,20 @@ function assertSnapshot(value: unknown): asserts value is RunnerSnapshot {
       lease === null ||
       typeof lease !== 'object' ||
       Object.keys(lease).sort().join(',') !==
-        'executionId,expiresAt,fencingToken,leaseId,resources,revoked,runnerId' ||
+        'actionDigest,approvalExpiresAt,authorizedAt,consumed,effectId,executionId,expiresAt,fencingToken,leaseId,resources,revoked,runnerId' ||
       !isUuid(lease.leaseId) ||
       !isUuid(lease.executionId) ||
+      !isUuid(lease.effectId) ||
+      typeof lease.actionDigest !== 'string' ||
+      !/^sha256:[a-f0-9]{64}$/u.test(lease.actionDigest) ||
       !isUuid(lease.runnerId) ||
       !Number.isSafeInteger(lease.fencingToken) ||
       lease.fencingToken <= 0 ||
+      !isRfc3339DateTime(lease.authorizedAt) ||
+      !isRfc3339DateTime(lease.approvalExpiresAt) ||
       !isRfc3339DateTime(lease.expiresAt) ||
+      Date.parse(lease.authorizedAt) >= Date.parse(lease.approvalExpiresAt) ||
+      Date.parse(lease.authorizedAt) >= Date.parse(lease.expiresAt) ||
       lease.resources === null ||
       typeof lease.resources !== 'object' ||
       resourceKeys.join(',') !==
@@ -239,13 +249,38 @@ function assertSnapshot(value: unknown): asserts value is RunnerSnapshot {
       lease.resources.networkMode !== 'DENY' ||
       lease.resources.gpuUnits !== 0 ||
       typeof lease.revoked !== 'boolean' ||
+      typeof lease.consumed !== 'boolean' ||
       leaseIds.has(lease.leaseId) ||
-      lease.fencingToken <= (highestFenceByExecution.get(lease.executionId) ?? 0)
+      lease.fencingToken <= (highestLeaseByExecution.get(lease.executionId)?.fencingToken ?? 0)
     ) {
       throw new Error('Invalid runner lease journal entry');
     }
     leaseIds.add(lease.leaseId);
-    highestFenceByExecution.set(lease.executionId, lease.fencingToken);
+    highestLeaseByExecution.set(lease.executionId, lease);
+  }
+  const revokedExecutions = new Set<string>();
+  for (const authority of snapshot.revokedLeaseAuthorities) {
+    const highestLease =
+      authority !== null && typeof authority === 'object'
+        ? highestLeaseByExecution.get(authority.executionId)
+        : undefined;
+    if (
+      authority === null ||
+      typeof authority !== 'object' ||
+      Object.keys(authority).sort().join(',') !== 'executionId,fencingToken,leaseId' ||
+      !isUuid(authority.leaseId) ||
+      !isUuid(authority.executionId) ||
+      !Number.isSafeInteger(authority.fencingToken) ||
+      authority.fencingToken <= 0 ||
+      revokedExecutions.has(authority.executionId) ||
+      (highestLease !== undefined &&
+        (authority.fencingToken < highestLease.fencingToken ||
+          (authority.fencingToken === highestLease.fencingToken &&
+            (authority.leaseId !== highestLease.leaseId || !highestLease.revoked))))
+    ) {
+      throw new Error('Invalid runner lease revocation journal entry');
+    }
+    revokedExecutions.add(authority.executionId);
   }
 }
 
@@ -336,6 +371,11 @@ export class FixtureRunnerJournal {
   get leaseOffers(): readonly DurableFixtureLeaseRecord[] {
     this.assertOperational();
     return this.snapshot.leaseOffers;
+  }
+
+  get revokedLeaseAuthorities(): readonly FixtureLeaseFence[] {
+    this.assertOperational();
+    return this.snapshot.revokedLeaseAuthorities;
   }
 
   isRevoked(serialNumber: string): boolean {
@@ -517,9 +557,13 @@ export class FixtureRunnerJournal {
     if (existing !== undefined && JSON.stringify(existing) !== JSON.stringify(lease)) {
       throw new Error('Lease identity or fencing conflict');
     }
-    const highestFence = this.snapshot.leaseOffers
+    const highestLeaseFence = this.snapshot.leaseOffers
       .filter(({ executionId }) => executionId === lease.executionId)
       .reduce((highest, candidate) => Math.max(highest, candidate.fencingToken), 0);
+    const revokedAuthority = this.snapshot.revokedLeaseAuthorities.find(
+      ({ executionId }) => executionId === lease.executionId,
+    );
+    const highestFence = Math.max(highestLeaseFence, revokedAuthority?.fencingToken ?? 0);
     if (existing === undefined && lease.fencingToken <= highestFence) {
       throw new Error('Lease fencing token is not monotonic for the execution');
     }
@@ -536,11 +580,118 @@ export class FixtureRunnerJournal {
       processedMessageIds: [...this.snapshot.processedMessageIds, messageId],
       leaseOffers:
         existing === undefined ? [...supersededLeaseOffers, lease] : supersededLeaseOffers,
+      revokedLeaseAuthorities:
+        existing === undefined
+          ? this.snapshot.revokedLeaseAuthorities.filter(
+              ({ executionId }) => executionId !== lease.executionId,
+            )
+          : this.snapshot.revokedLeaseAuthorities,
+    });
+  }
+
+  recordLeaseConsumption(authority: {
+    readonly leaseId: string;
+    readonly executionId: string;
+    readonly fencingToken: number;
+    readonly effectId: string;
+    readonly actionDigest: string;
+  }): void {
+    const lease = this.snapshot.leaseOffers.find(({ leaseId }) => leaseId === authority.leaseId);
+    if (
+      lease === undefined ||
+      lease.revoked ||
+      lease.consumed ||
+      lease.executionId !== authority.executionId ||
+      lease.fencingToken !== authority.fencingToken ||
+      lease.effectId !== authority.effectId ||
+      lease.actionDigest !== authority.actionDigest
+    ) {
+      throw new Error('Runner lease is not authorized for this effect or is already consumed');
+    }
+    this.replace({
+      ...this.snapshot,
+      leaseOffers: this.snapshot.leaseOffers.map((candidate) =>
+        candidate.leaseId === authority.leaseId ? { ...candidate, consumed: true } : candidate,
+      ),
+    });
+  }
+
+  recordLeaseRevocationAndMessage(
+    messageId: string,
+    authority: {
+      readonly leaseId: string;
+      readonly executionId: string;
+      readonly fencingToken: number;
+    },
+  ): void {
+    if (this.hasProcessed(messageId)) throw new Error('Runner message replayed');
+    if (
+      !isUuid(authority.leaseId) ||
+      !isUuid(authority.executionId) ||
+      !Number.isSafeInteger(authority.fencingToken) ||
+      authority.fencingToken <= 0
+    ) {
+      throw new Error('Stale or invalid runner lease fence');
+    }
+    const lease = this.snapshot.leaseOffers.find(({ leaseId }) => leaseId === authority.leaseId);
+    if (
+      lease !== undefined &&
+      (lease.executionId !== authority.executionId || lease.fencingToken !== authority.fencingToken)
+    ) {
+      throw new Error('Stale or invalid runner lease fence');
+    }
+    const highestLease = this.snapshot.leaseOffers
+      .filter(({ executionId }) => executionId === authority.executionId)
+      .reduce<DurableFixtureLeaseRecord | undefined>(
+        (highest, candidate) =>
+          highest === undefined || candidate.fencingToken > highest.fencingToken
+            ? candidate
+            : highest,
+        undefined,
+      );
+    const revokedAuthority = this.snapshot.revokedLeaseAuthorities.find(
+      ({ executionId }) => executionId === authority.executionId,
+    );
+    const highestAuthority =
+      revokedAuthority !== undefined &&
+      (highestLease === undefined || revokedAuthority.fencingToken >= highestLease.fencingToken)
+        ? revokedAuthority
+        : highestLease;
+    if (
+      highestAuthority !== undefined &&
+      (authority.fencingToken < highestAuthority.fencingToken ||
+        (authority.fencingToken === highestAuthority.fencingToken &&
+          authority.leaseId !== highestAuthority.leaseId))
+    ) {
+      throw new Error('Stale or invalid runner lease fence');
+    }
+    const durableAuthority: FixtureLeaseFence = Object.freeze({
+      leaseId: authority.leaseId,
+      executionId: authority.executionId,
+      fencingToken: authority.fencingToken,
+    });
+    this.replace({
+      ...this.snapshot,
+      processedMessageIds: [...this.snapshot.processedMessageIds, messageId],
+      leaseOffers: this.snapshot.leaseOffers.map((candidate) =>
+        candidate.executionId === authority.executionId &&
+        candidate.fencingToken <= authority.fencingToken &&
+        !candidate.revoked
+          ? { ...candidate, revoked: true }
+          : candidate,
+      ),
+      revokedLeaseAuthorities: [
+        ...this.snapshot.revokedLeaseAuthorities.filter(
+          ({ executionId }) => executionId !== authority.executionId,
+        ),
+        durableAuthority,
+      ],
     });
   }
 
   private replace(snapshot: RunnerSnapshot): void {
     this.assertOperational();
+    assertSnapshot(snapshot);
     this.persist(snapshot);
     this.snapshot = snapshot;
   }

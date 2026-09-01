@@ -5,6 +5,7 @@ import { join } from 'node:path';
 
 import {
   createPostgresControlPlane,
+  InMemoryApprovedEffectExecutor,
   ProjectService,
   PostgresProjectRepository,
 } from '../../apps/control-plane/src/index.js';
@@ -45,6 +46,7 @@ describe('fixture scheduler temporal authority', () => {
       now: () => new Date('2026-08-31T21:00:00.000Z'),
       nextId: createDeterministicUuid('temporal-scheduler'),
       expectedRevision: '857f0f9b02210000000000000000000000000000',
+      runnerId: '40000000-0000-4000-8000-000000000021',
     });
     return scheduler.schedule({
       projectId: '40000000-0000-4000-8000-000000000010',
@@ -148,7 +150,6 @@ describe.sequential('start and observe PostgreSQL journey', () => {
     const service = new ProjectService({
       repository,
       scheduler,
-      now: () => clock.now(),
       nextId: createDeterministicUuid('us1-project'),
     });
     const submitted = await service.submitObjective({
@@ -267,6 +268,7 @@ describe.sequential('start and observe PostgreSQL journey', () => {
       expectedRevision: '857f0f9b02210000000000000000000000000000',
       now: () => new Date('2026-08-31T21:00:00.000Z'),
       nextId: createDeterministicUuid('postgres-http'),
+      effectExecutor: new InMemoryApprovedEffectExecutor(),
     });
     try {
       const bootstrap = await controlPlane.server.inject({
@@ -322,7 +324,6 @@ describe.sequential('start and observe PostgreSQL journey', () => {
           expectedRevision: '857f0f9b02210000000000000000000000000000',
           activeSpecialists,
         }),
-        now: () => new Date('2026-08-31T21:00:00.000Z'),
         nextId: createDeterministicUuid(`project-${activeSpecialists}`),
       });
 
@@ -362,7 +363,6 @@ describe.sequential('start and observe PostgreSQL journey', () => {
       const service = new ProjectService({
         repository,
         scheduler,
-        now: () => new Date('2026-08-31T21:00:00.000Z'),
         nextId: createDeterministicUuid(`concurrent-project-${index}`),
       });
       return service.submitObjective({

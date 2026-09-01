@@ -15,7 +15,13 @@ import {
   ProjectService,
   type ProjectRepository,
 } from '../application/projects/index.js';
+import {
+  InMemoryApprovedEffectExecutor,
+  SupervisionService,
+  type ApprovedEffectExecutor,
+} from '../application/supervision/index.js';
 import { LoopbackSessionManager } from './session.js';
+import { registerSupervisionRoutes } from './supervision.js';
 
 const IDEMPOTENCY_PATTERN = /^[!-~]{16,128}$/u;
 const scenarioValues = new Set([
@@ -111,12 +117,19 @@ function objectiveBody(value: unknown): { objective: string; fixtureScenario: Fi
 export function createControlPlaneServer(input: {
   readonly service: ProjectService;
   readonly repository: ProjectRepository;
+  readonly supervision: SupervisionService;
   readonly sessions: LoopbackSessionManager;
   readonly version?: string;
 }): FastifyInstance {
   const server = Fastify({ logger: false });
 
   server.get('/v1/health', async () => ({ status: 'alive', version: input.version ?? '0.0.0' }));
+
+  registerSupervisionRoutes({
+    server,
+    supervision: input.supervision,
+    sessions: input.sessions,
+  });
 
   server.post('/v1/session/bootstrap', async (request, reply) => {
     const requestCorrelation = correlation(request);
@@ -299,8 +312,14 @@ export function createFixtureControlPlane(input: {
   readonly repository: InMemoryProjectRepository;
   readonly service: ProjectService;
   readonly scheduler: FixtureScheduler;
+  readonly supervision: SupervisionService;
+  readonly effectExecutor: InMemoryApprovedEffectExecutor;
+  readonly advanceTime: (milliseconds: number) => void;
+  readonly resetTime: () => void;
 } {
-  const fixtureNow = () => new Date('2026-08-31T21:00:00.000Z');
+  const initialTime = Date.parse('2026-08-31T21:00:00.000Z');
+  let fixtureTime = initialTime;
+  const fixtureNow = () => new Date(fixtureTime);
   const repository = new InMemoryProjectRepository(fixtureNow);
   const sessions = new LoopbackSessionManager(
     input.bootstrapSecret,
@@ -315,11 +334,34 @@ export function createFixtureControlPlane(input: {
   const service = new ProjectService({
     repository,
     scheduler,
-    now: fixtureNow,
     nextId: randomUUID,
   });
-  const server = createControlPlaneServer({ service, repository, sessions });
-  return { server, sessions, repository, service, scheduler };
+  const effectExecutor = new InMemoryApprovedEffectExecutor();
+  const supervision = new SupervisionService({
+    repository,
+    effectExecutor,
+    nextId: randomUUID,
+    expectedRevision: scheduler.expectedRevision,
+    systemId: randomUUID(),
+    runnerId: randomUUID(),
+  });
+  const server = createControlPlaneServer({ service, repository, supervision, sessions });
+  return {
+    server,
+    sessions,
+    repository,
+    service,
+    scheduler,
+    supervision,
+    effectExecutor,
+    advanceTime: (milliseconds) => {
+      fixtureTime += milliseconds;
+    },
+    resetTime: () => {
+      fixtureTime = initialTime;
+      effectExecutor.clear();
+    },
+  };
 }
 
 export function createPostgresControlPlane(input: {
@@ -328,15 +370,18 @@ export function createPostgresControlPlane(input: {
   readonly origin: string;
   readonly supervisorId: string;
   readonly expectedRevision: string;
+  readonly runnerId: string;
   readonly now?: () => Date;
   readonly nextId?: () => string;
   readonly version?: string;
+  readonly effectExecutor: ApprovedEffectExecutor;
 }): {
   readonly server: FastifyInstance;
   readonly sessions: LoopbackSessionManager;
   readonly repository: PostgresProjectRepository;
   readonly service: ProjectService;
   readonly scheduler: FixtureScheduler;
+  readonly supervision: SupervisionService;
 } {
   const now = input.now ?? (() => new Date());
   const nextId = input.nextId ?? randomUUID;
@@ -353,12 +398,21 @@ export function createPostgresControlPlane(input: {
     nextId,
     expectedRevision: input.expectedRevision,
   });
-  const service = new ProjectService({ repository, scheduler, now, nextId });
+  const service = new ProjectService({ repository, scheduler, nextId });
+  const supervision = new SupervisionService({
+    repository,
+    effectExecutor: input.effectExecutor,
+    nextId,
+    expectedRevision: input.expectedRevision,
+    systemId: nextId(),
+    runnerId: input.runnerId,
+  });
   const server = createControlPlaneServer({
     service,
     repository,
+    supervision,
     sessions,
     ...(input.version === undefined ? {} : { version: input.version }),
   });
-  return { server, sessions, repository, service, scheduler };
+  return { server, sessions, repository, service, scheduler, supervision };
 }

@@ -9,6 +9,7 @@ export interface ProjectView {
   readonly projectId: string;
   readonly objective: string;
   readonly status: string;
+  readonly version: number;
   readonly lastSequence: number;
   readonly personas: readonly Record<string, unknown>[];
   readonly specialists: readonly Record<string, unknown>[];
@@ -21,6 +22,52 @@ export interface ProjectView {
     readonly activeRunnerJobs: number;
     readonly runnerJobLimit: number;
   };
+}
+
+export interface ApprovalView {
+  readonly approvalId: string;
+  readonly projectId: string;
+  readonly taskId: string;
+  readonly requesterAgentId: string;
+  readonly state: 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED';
+  readonly actionDigest: `sha256:${string}`;
+  readonly scope: string;
+  readonly reason: string;
+  readonly riskSummary: string;
+  readonly expiresAt: string;
+  readonly decidedAt: string | null;
+  readonly decisionActorId: string | null;
+  readonly version: number;
+}
+
+export interface SupervisionView {
+  readonly items: readonly ApprovalView[];
+  readonly budget: {
+    readonly invocationLimit: number;
+    readonly consumedInvocations: number;
+    readonly monetaryLimitMicros: number;
+    readonly consumedMonetaryMicros: number;
+  };
+  readonly authority: {
+    readonly executionState: string;
+    readonly capabilityLeaseState: 'ACTIVE' | 'SUSPENDED' | 'REVOKED';
+    readonly runnerLeaseState: 'ACTIVE' | 'REVOKED';
+    readonly successor: boolean;
+  };
+  readonly effects: readonly {
+    readonly effectId: string;
+    readonly taskId: string;
+    readonly actionDigest: `sha256:${string}`;
+    readonly semanticKey: string;
+    readonly state:
+      'REQUESTED' | 'EXECUTING' | 'APPLIED' | 'FAILED' | 'UNKNOWN' | 'RECONCILING' | 'RECONCILED';
+    readonly reconciliationOutcome: string | null;
+    readonly groundTruthDigest: `sha256:${string}` | null;
+    readonly version: number;
+  }[];
+  readonly blockedReasons: readonly string[];
+  readonly projectState: string;
+  readonly projectVersion: number;
 }
 
 export async function bootstrap(secret: string): Promise<void> {
@@ -64,6 +111,94 @@ export async function getProject(projectId: string): Promise<ProjectView> {
   });
   if (!response.ok) throw new Error('Unable to load the durable project view.');
   return response.json() as Promise<ProjectView>;
+}
+
+async function responseBody(response: Response, fallback: string): Promise<unknown> {
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const problem = body as {
+      readonly detail?: string;
+      readonly title?: string;
+      readonly code?: string;
+    };
+    throw new Error(problem.detail ?? problem.title ?? problem.code ?? fallback);
+  }
+  return body;
+}
+
+export async function listApprovals(projectId: string): Promise<SupervisionView> {
+  const response = await fetch(`/v1/projects/${encodeURIComponent(projectId)}/approvals`, {
+    credentials: 'include',
+  });
+  return (await responseBody(response, 'Unable to load supervision.')) as SupervisionView;
+}
+
+export async function getApproval(
+  projectId: string,
+  approvalId: string,
+): Promise<{ readonly approval: ApprovalView; readonly etag: string }> {
+  const response = await fetch(
+    `/v1/projects/${encodeURIComponent(projectId)}/approvals/${encodeURIComponent(approvalId)}`,
+    { credentials: 'include' },
+  );
+  const approval = (await responseBody(response, 'Unable to load the approval.')) as ApprovalView;
+  const etag = response.headers.get('etag');
+  if (etag === null) throw new Error('The approval response did not include a version validator.');
+  return { approval, etag };
+}
+
+export async function decideApproval(input: {
+  readonly projectId: string;
+  readonly approvalId: string;
+  readonly decision: 'APPROVE' | 'REJECT';
+  readonly actionDigest: `sha256:${string}`;
+  readonly reason: string;
+}): Promise<ApprovalView> {
+  const current = await getApproval(input.projectId, input.approvalId);
+  if (current.approval.actionDigest !== input.actionDigest)
+    throw new Error('The displayed action changed before the decision could be submitted.');
+  const response = await fetch(
+    `/v1/projects/${encodeURIComponent(input.projectId)}/approvals/${encodeURIComponent(input.approvalId)}/decision`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': id(),
+        'x-correlation-id': id(),
+        'if-match': current.etag,
+      },
+      body: JSON.stringify({
+        decision: input.decision,
+        actionDigest: input.actionDigest,
+        reason: input.reason,
+      }),
+    },
+  );
+  return (await responseBody(response, 'Unable to record the approval decision.')) as ApprovalView;
+}
+
+export async function controlProject(input: {
+  readonly projectId: string;
+  readonly command: 'pause' | 'resume' | 'stop' | 'cancel';
+  readonly reason: string;
+  readonly projectVersion: number;
+}): Promise<void> {
+  const response = await fetch(
+    `/v1/projects/${encodeURIComponent(input.projectId)}/commands/${input.command}`,
+    {
+      method: 'POST',
+      credentials: 'include',
+      headers: {
+        'content-type': 'application/json',
+        'idempotency-key': id(),
+        'x-correlation-id': id(),
+        'if-match': `"${input.projectVersion}"`,
+      },
+      body: JSON.stringify({ reason: input.reason }),
+    },
+  );
+  await responseBody(response, `Unable to ${input.command} the project.`);
 }
 
 export async function replayEvents(
