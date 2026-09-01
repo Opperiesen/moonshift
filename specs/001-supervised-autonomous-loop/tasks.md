@@ -213,7 +213,7 @@ record is consistently linked and ordered, and no failed/blocked/cancelled state
 - [x] T072 [US5] Implement cursor-expiry fallback and client-side event deduplication/projection refresh in `apps/web/src/services/project-events.ts`
 - [x] T073 [US5] Complete the accessible Results audit timeline, execution/checkpoint history, approval history, and real terminal-state summaries in `apps/web/src/features/results/`
 - [x] T074 [US5] Add the CLI project inspection/export command using the same read contract in `apps/cli/src/commands/project-inspect.ts`
-- [ ] T075 [US5] Run the independent US5 tests and record linked-record, ordering, reconnect, accessibility, and state-truthfulness evidence in `evidence/001-supervised-autonomous-loop/us5/manifest.json`
+- [x] T075 [US5] Run the independent US5 tests and record linked-record, ordering, reconnect, accessibility, and state-truthfulness evidence in `evidence/001-supervised-autonomous-loop/us5/manifest.json`
 
 **Checkpoint**: All five stories are independently accepted and compose into the reference browser
 journey without relying on ephemeral backend or browser state.

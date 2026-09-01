@@ -1,71 +1,64 @@
 # Current Moonshift Work
 
 - Active feature: `001-supervised-autonomous-loop`
-- Allowed task range: `T058–T068`
-- Checkpoint: `US4 — Recover Without Losing or Duplicating Work`
-- Status: `US4_COMPLETE`
-- Branch: `codex/us4-recovery`
-- US3 base: `65c5b8462282e277cc54c2fd3695ac4ef55b8d6d`
-- US4 implementation: `dc766b2f0b92d115c45a370009005641217ad14b`
+- Allowed task range: `T069–T075`
+- Checkpoint: `US5 — Inspect a Complete Result and Audit Trail`
+- Status: `US5_COMPLETE`
+- Branch: `codex/us5-results-audit`
+- US4 base: `c47727ac3a9ead1dca243ff22cc5175c10d31b6f`
+- US5 implementation: `6239deb2a8d63e51b2d793c0c0348f2044356fe3`
 - Worktree: clean after the local evidence/continuity checkpoint commit
-- Last updated: `2026-09-01T17:25:37Z`
+- Last updated: `2026-09-01T18:28:16Z`
 
 ## Completed tasks
 
-`T058–T068` — versioned, complete, integrity-bound provider-neutral checkpoints; durable heartbeat
-loss detection and monotonic fencing; stale-runtime rejection; seven-boundary effect reconciliation
-with bounded `UNKNOWN` blocking; three-phase recovery outside database transactions; startup
-reconstruction and queue resumption; PostgreSQL outbox claim/apply/ACK and projection catch-up;
-capability-compatible continuation on the second fake connection; stable logical identities with
-fresh execution authority; truthful browser recovery states; deterministic contract, integration,
-restart, crash, and acceptance coverage; independent review; bounded convergence; and durable US4
-evidence.
+`T069–T075` — complete linked Result records; exact connection, backend, model, execution, and
+revision provenance; durable execution/checkpoint history; bijective supervision-audit projection
+with dual audit/project identities and sequences; durable cursor hydration, gap/conflict reload, and
+event deduplication; accessible browser history and truthful terminal states; authenticated loopback
+CLI summary/JSON inspection with safe export; PostgreSQL restart coverage; deterministic contract,
+integration, recovery, and browser evidence; independent review; bounded convergence; and durable
+US5 evidence.
 
 ## First incomplete task
 
-`T069` — result-projection integration tests for stable linked records, provenance, state parity,
-ordered replay, projection reload, and terminal-state truthfulness. This begins User Story 5 and is
-intentionally outside the completed US4 scope; do not start it until the next bounded iteration is
-explicitly authorized.
+`T076` — hardening negative security tests. This begins Phase 8 and is intentionally outside the
+completed US5 scope; do not start it until the next bounded iteration is explicitly authorized.
 
 ## Principal files changed
 
-- `apps/control-plane/src/application/recovery/` — checkpoint compilation and validation, recovery
-  orchestration, bounded effect lookup, durable prepare/finalize phases, and actionable blocking
-- `apps/control-plane/src/bootstrap/recovery.ts` — restart reconstruction, heartbeat-expiry recovery,
-  paused-state preservation, queue release, and projection/outbox catch-up
-- `apps/control-plane/src/scheduler/recovery.ts` and
-  `apps/control-plane/src/scheduler/backend-switch.ts` — monotonic successor authority and
-  capability-compatible second-backend routing
-- `apps/control-plane/src/application/projects/postgres-repository.ts` and
-  `apps/control-plane/src/projections/project-outbox.ts` — durable runtime/checkpoint state plus
-  production outbox claim, apply, projection checkpoint, ACK, and expired-claim recovery
-- `apps/control-plane/src/application/supervision/` — effect authority revocation, exact fencing-tuple
-  enforcement, lookup, stable semantic keys, and approval-required replay
-- `packages/contracts/` and `specs/001-supervised-autonomous-loop/contracts/` — execution checkpoint
-  schema, backend continuation fields, and public recovery projection contract
-- `packages/backend-fake/src/backend.ts` — conformant provider-neutral second fake continuation
-- `apps/web/src/` — persisted active-project reconnection and explicit recovering, switched-backend,
-  approval-required, and blocked-recovery states
-- `tests/recovery/`, `tests/contract/checkpoint.test.ts`, and
-  `tests/acceptance/recovery.spec.ts` — checkpoint, restart, crash-matrix, fencing, reconciliation,
-  backend-switch, PostgreSQL, and browser evidence
-- `evidence/001-supervised-autonomous-loop/us4/manifest.json` — authoritative T068 evidence record
-- `specs/001-supervised-autonomous-loop/tasks.md` — T058–T068 completed; T069 remains unchecked
+- `apps/control-plane/src/projections/result-detail.ts` — complete linked Result read model,
+  provenance, blockers/recovery, and fail-closed audit mapping
+- `apps/control-plane/src/application/projects/result-history.ts` and project repositories — durable
+  execution/checkpoint history across state transitions and PostgreSQL restart
+- `apps/web/src/services/project-events.ts` and `apps/web/src/features/observe/Observe.tsx` — persisted
+  cursor hydration, ordered replay, deduplication, and projection reload on expiry, gaps, or conflicts
+- `apps/web/src/features/results/Results.tsx` — accessible complete result record, provenance,
+  approvals, execution/checkpoint/effect history, recovery, blockers, and audit timeline
+- `apps/cli/src/commands/project-inspect.ts` — strict shared-contract supervisor inspection and safe
+  summary/JSON export from a loopback endpoint
+- `packages/contracts/` and `specs/001-supervised-autonomous-loop/contracts/http-api.openapi.yaml` —
+  strict ResultView validation and complete public result/audit contract
+- `tests/integration/`, `tests/recovery/control-plane-restart.test.ts`, and
+  `tests/acceptance/results-audit.spec.ts` — linked records, audit identity, reconnect, CLI, restart,
+  accessibility, blockers, and state-truthfulness evidence
+- `evidence/001-supervised-autonomous-loop/us5/manifest.json` — authoritative T075 evidence record
+- `specs/001-supervised-autonomous-loop/tasks.md` — T069–T075 completed; T076 remains unchecked
 
 ## Verification evidence
 
-| Command                                            | Result | Notes                                                                                                                                                        |
-| -------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Focused recovery suite                             | PASS   | 4 files/27 tests; restart, runtime loss, seven effect boundaries, fencing, reconciliation, backend switch, and no-compatible-backend blocking                |
-| `pnpm clean && pnpm validate`                      | PASS   | Pinned Node 24.20.0/pnpm 11.24.0; format, lint, boundaries, lockfile, image pins, secrets, typecheck, 91 unit/71 contract/110 integration tests              |
-| `pnpm test:acceptance`                             | PASS   | 19/19 Chromium tests; pause, restart, reconnect, recovery progress, switched backend, approval-required replay, and actionable blocking                      |
-| `pnpm --filter @moonshift/web build`               | PASS   | Vite production build completed                                                                                                                              |
-| `pnpm contracts:generate`                          | PASS   | Contract derivatives generated successfully                                                                                                                  |
-| `node scripts/generate-contract-types.mjs --check` | PASS   | Generated contract types reproduce from approved contracts                                                                                                   |
-| Independent final review                           | PASS   | Fresh post-repair reviewer found no substantive T058–T068 findings                                                                                           |
-| `$speckit-converge` bounded to T058–T068           | PASS   | 5 US4 scenarios, FR-023–FR-029/FR-035, SC-002/SC-005/SC-008, tasks, implementation, tests, and evidence align; no task was appended; T069+ was not evaluated |
-| `git diff --check`                                 | PASS   | No whitespace errors                                                                                                                                         |
+| Command                                            | Result | Notes                                                                                                                                                                 |
+| -------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Focused US5 suite                                  | PASS   | 5 files/46 tests; linked records, complete audit, reconnect/replay, CLI contract/export, and PostgreSQL restart history                                               |
+| Focused recovery suite                             | PASS   | 4 files/28 tests; restart, runtime loss, effect boundaries, fencing, reconciliation, backend switch, and result-history persistence                                   |
+| `pnpm clean && pnpm validate`                      | PASS   | Pinned Node 24.20.0/pnpm 11.24.0; format, lint, boundaries, lockfile, image pins, secrets, typecheck, 91 unit/71 contract/142 integration tests                       |
+| `pnpm test:acceptance`                             | PASS   | 23/23 Chromium tests; complete Results reconnect/reload, actual terminal states, recovery progress, and blockers                                                      |
+| `pnpm --filter @moonshift/web build`               | PASS   | Vite production build completed                                                                                                                                       |
+| `pnpm contracts:generate`                          | PASS   | Contract derivatives generated successfully                                                                                                                           |
+| `node scripts/generate-contract-types.mjs --check` | PASS   | Generated contract types reproduce from approved contracts                                                                                                            |
+| Independent final review                           | PASS   | Fresh post-repair reviewer found no substantive T069–T075 findings                                                                                                    |
+| `$speckit-converge` bounded to T069–T075           | PASS   | 3 US5 scenarios, FR-034–FR-036, SC-008/SC-010/SC-011, plan, constitution, tasks, implementation, tests, and evidence align; no task appended; T076+ was not evaluated |
+| `git diff --check`                                 | PASS   | No whitespace errors                                                                                                                                                  |
 
 ## Open findings
 
@@ -73,20 +66,19 @@ explicitly authorized.
   Node.js `24.20.0` and pnpm `11.24.0` wrapper.
 - `docker` and `psql` are not on `PATH`; deterministic integration validation uses the approved
   embedded PostgreSQL 18.4 server.
-- US4 performs only controlled fixture recovery. It uses no real provider credential, unrestricted
+- US5 inspects controlled fixture state only. It uses no real provider credential, unrestricted
   shell, external network effect, remote Git mutation, or production mutation.
-- Recovery depends on a capability-compatible alternate connection. If one is unavailable or backend
-  continuation fails, startup remains available and the project durably enters actionable
-  `BLOCKED_RECOVERY` rather than receiving unsafe successor authority.
-- Reconciled `NOT_APPLIED` uncertainty retains the stable semantic key but creates a fresh approval
-  and effect-attempt identity before another dispatch; `APPLIED` resumes after the effect, and
-  `UNKNOWN` never dispatches blindly.
-- Independent reviews drove repairs for backend planning/completion separation, successful-result
-  validation, normalized interruption fixtures, fresh approval after uncertain non-application,
-  backend exception isolation, and no-compatible-backend startup behavior. The final fresh review
-  reported no substantive findings.
+- The CLI accepts only a loopback HTTP endpoint, obtains its supervisor session from
+  `MOONSHIFT_SESSION_COOKIE`, never exposes a cookie argument, and creates exports exclusively with
+  owner-only mode `0600`.
+- Result audit projection fails closed when a durable supervision audit record cannot be assigned to
+  a unique compatible project-event carrier; it never fabricates an audit or evidence execution ID.
+- Independent review drove repairs for complete material-action audit mapping, exact dual audit/event
+  identity, terminal execution timing, durable reconnect hydration, working-directory-independent
+  contract loading, strict CLI response validation, and PostgreSQL history coverage. The final fresh
+  review reported no substantive findings.
 
 ## Exact next action
 
-US4 is complete; stop here. T069 begins User Story 5 and must remain untouched until the next
-explicitly authorized bounded iteration.
+US5 is complete; stop here. T076 begins hardening and must remain untouched until the next explicitly
+authorized bounded iteration.

@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "1.0",
+  "feature": "001-supervised-autonomous-loop",
+  "checkpoint": "US5_INSPECT_COMPLETE_RESULT_AND_AUDIT_TRAIL",
+  "generatedAt": "2026-09-01T18:28:16Z",
+  "scope": {
+    "tasks": ["T069", "T070", "T071", "T072", "T073", "T074", "T075"],
+    "excludedFromThisCheckpoint": "T076+"
+  },
+  "revisions": {
+    "us4Base": "c47727ac3a9ead1dca243ff22cc5175c10d31b6f",
+    "implementation": "6239deb2a8d63e51b2d793c0c0348f2044356fe3"
+  },
+  "environment": {
+    "node": "24.20.0",
+    "pnpm": "11.24.0",
+    "postgresql": "18.4 embedded loopback fixture",
+    "browser": "Playwright 1.62.1 Chromium"
+  },
+  "validation": [
+    {
+      "command": "pnpm exec vitest run tests/integration/result-projection.test.ts tests/integration/project-events-client.test.ts tests/integration/project-inspect-cli.test.ts tests/contract/results-api.test.ts tests/recovery/control-plane-restart.test.ts --config vitest.config.ts",
+      "result": "PASS",
+      "evidence": "5 focused files and 46 tests passed for complete result linkage, event replay, CLI inspection, the public Result contract, and PostgreSQL restart persistence."
+    },
+    {
+      "command": "pnpm exec vitest run tests/recovery/control-plane-restart.test.ts tests/recovery/backend-switch.test.ts tests/recovery/effect-crash-matrix.test.ts tests/recovery/runtime-recovery.test.ts --config vitest.config.ts",
+      "result": "PASS",
+      "evidence": "4 recovery files and 28 tests passed, including immutable execution/checkpoint history across a PostgreSQL control-plane restart."
+    },
+    {
+      "command": "pnpm clean && pnpm validate",
+      "result": "PASS",
+      "evidence": "Format, lint and boundaries, lockfile integrity, immutable image pins, secret scan, typecheck, 91 unit tests, 71 contract tests, and 142 integration tests passed."
+    },
+    {
+      "command": "pnpm test:acceptance",
+      "result": "PASS",
+      "evidence": "23 of 23 Chromium tests passed, including four US5 Results cases for reconnect, expired-cursor reload, terminal-state truthfulness, and actionable blockers."
+    },
+    {
+      "command": "pnpm --filter @moonshift/web build",
+      "result": "PASS",
+      "evidence": "Vite production build completed successfully."
+    },
+    {
+      "command": "pnpm contracts:generate",
+      "result": "PASS",
+      "evidence": "Contract derivatives generated successfully from the approved schemas."
+    },
+    {
+      "command": "node scripts/generate-contract-types.mjs --check",
+      "result": "PASS",
+      "evidence": "Generated TypeScript derivatives reproduce from the approved OpenAPI and runner protocol contracts."
+    },
+    {
+      "command": "git diff --check",
+      "result": "PASS",
+      "evidence": "No whitespace errors."
+    },
+    {
+      "command": "$speckit-converge bounded to T069-T075",
+      "result": "PASS",
+      "evidence": "The three US5 acceptance scenarios, FR-034 through FR-036, SC-008, SC-010, SC-011, plan decisions, constitution principles, tasks, implementation, tests, and evidence align; no task was appended and T076+ was not evaluated."
+    }
+  ],
+  "linkedRecordEvidence": {
+    "surface": "One ResultView links the project and task to artifact integrity, evidence and reviewer lineage, approval history, all executions, checkpoints, effects, organization activity, recovery state, blockers, and audit history.",
+    "provenance": "Every execution retains stable project/task/specialist identities plus its exact backend connection, backend descriptor family/version, model descriptor ID/version, optional session hint, and lifecycle timestamps.",
+    "evidenceIntegrity": "Artifact-backed evidence links to the owning artifact and execution; evidence without an artifact remains explicitly nullable rather than receiving a fabricated execution identity.",
+    "history": "Durable result history retains predecessor and successor executions and checkpoints through pause, resume, recovery, and PostgreSQL restart."
+  },
+  "auditEvidence": {
+    "coverage": "Every authoritative project event appears once in project sequence, and every supervision audit record is assigned bijectively to one compatible project-event carrier or projection fails closed.",
+    "identity": "Audit rows retain both the true supervision audit identity/sequence and the durable project event identity/sequence.",
+    "attribution": "Material supervision records preserve actor, action, target, time, reason, outcome, and correlation identity; generic project events retain their bounded observable details.",
+    "privacy": "The public projection remains allowlisted and contains no raw prompts, transcripts, credentials, authorization material, private reasoning, or host-sensitive paths."
+  },
+  "reconnectEvidence": {
+    "durableHydration": "A browser reload reconstructs ordered activity from ResultView audit data before replaying events after its persisted cursor.",
+    "cursorExpiry": "An expired cursor reloads the durable projection and advances to its high-water mark before reconnecting.",
+    "deduplication": "Exact redelivery is ignored; event-ID or sequence collisions and gaps trigger a durable projection reload rather than accepting ambiguous state.",
+    "presence": "Projection reload carries durable ProjectView presence and does not infer agent presence from a live socket."
+  },
+  "stateTruthfulnessEvidence": {
+    "verified": "Only a verified task with a completed project renders as verified/done.",
+    "nonVerified": "Unverified, suspended, stopping, stopped, paused, blocked, failed, and cancelled fixtures retain their actual project/task/execution state and never render as done.",
+    "actionability": "Verification blockers and recovery progress are projected from authoritative state and rendered as explicit recovery or remediation information."
+  },
+  "cliEvidence": {
+    "contract": "The moonshift project inspect command consumes the same strict ResultView contract as the browser and rejects incomplete or widened responses.",
+    "access": "Inspection requires a supervisor session supplied only through the environment and accepts only loopback HTTP endpoints.",
+    "export": "Summary and JSON output are supported; file export is exclusive and owner-readable/writable with mode 0600, including when invoked outside the repository working directory."
+  },
+  "independentReview": {
+    "reviewer": "us5_review",
+    "repairs": "Independent review drove complete material-action audit mapping, exact audit identity and sequence preservation, terminal execution timing, durable reconnect hydration, current-working-directory-independent contract loading, strict CLI response validation, and PostgreSQL history coverage.",
+    "finalResult": "PASS_NO_SUBSTANTIVE_FINDINGS",
+    "reviewedRisks": "Complete linked records, audit bijection and attribution, dual identities and sequences, reconnect gaps and duplicates, terminal-state truthfulness, provenance, evidence nullability, restart persistence, CLI authentication and export safety, OpenAPI parity, privacy, idempotence, and bounded scope."
+  },
+  "safety": {
+    "realProviderUsed": false,
+    "providerCredentialUsed": false,
+    "unrestrictedShellUsed": false,
+    "externalNetworkEffectPerformed": false,
+    "simulatedSensitiveFixtureEffectPerformed": true,
+    "realSensitiveEffectPerformed": false,
+    "productionMutationPerformed": false,
+    "remoteGitMutationPerformed": false,
+    "resultInspectionClaimed": true
+  }
+}
