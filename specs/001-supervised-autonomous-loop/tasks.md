@@ -156,7 +156,7 @@ the passing artifact reviewed outside the author lineage reaches `VERIFIED`.
 - [x] T054 [US3] Persist artifacts, evidence, verification policy/rules/evaluations, and revision bindings transactionally in `packages/persistence/src/repositories/verification.ts`
 - [x] T055 [US3] Implement result queries and verification event projections without completion inflation in `apps/control-plane/src/projections/results.ts`
 - [x] T056 [P] [US3] Implement Results artifact and evidence matrix states with explicit reviewer lineage and blocking reasons in `apps/web/src/features/results/`
-- [ ] T057 [US3] Run the independent US3 tests and record passing/failing rule matrices, artifact hashes, revision, and Quality lineage in `evidence/001-supervised-autonomous-loop/us3/manifest.json`
+- [x] T057 [US3] Run the independent US3 tests and record passing/failing rule matrices, artifact hashes, revision, and Quality lineage in `evidence/001-supervised-autonomous-loop/us3/manifest.json`
 
 **Checkpoint**: US3 is independently accepted; a specialist claim alone is never displayed or stored
 as verified completion.

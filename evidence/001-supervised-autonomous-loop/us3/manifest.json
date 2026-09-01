@@ -1,0 +1,135 @@
+{
+  "schemaVersion": "1.0",
+  "feature": "001-supervised-autonomous-loop",
+  "checkpoint": "US3_VERIFY_CLAIMS_WITH_INDEPENDENT_EVIDENCE",
+  "generatedAt": "2026-09-01T11:34:31Z",
+  "scope": {
+    "tasks": [
+      "T047",
+      "T048",
+      "T049",
+      "T050",
+      "T051",
+      "T052",
+      "T053",
+      "T054",
+      "T055",
+      "T056",
+      "T057"
+    ],
+    "excludedFromThisCheckpoint": "T058+"
+  },
+  "revisions": {
+    "us2Base": "b90bbe584f98af7864cf101856fa109a35b9e1a7",
+    "implementation": "6d6e1b2a3b184fb5fc39a5a99f5c937aa196d2c2"
+  },
+  "environment": {
+    "node": "24.20.0",
+    "pnpm": "11.24.0",
+    "postgresql": "18.4 embedded loopback fixture",
+    "browser": "Playwright 1.62.1 Chromium"
+  },
+  "validation": [
+    {
+      "command": "pnpm exec vitest run --project contract tests/contract/results-api.test.ts",
+      "result": "PASS",
+      "evidence": "7 of 7 Results contract tests passed, including concurrent semantically identical RESUME delivery with distinct correlation identities."
+    },
+    {
+      "command": "pnpm clean && pnpm validate",
+      "result": "PASS",
+      "evidence": "Format, lint and boundaries, lockfile integrity, immutable image pins, secret scan, typecheck, 91 unit tests, 67 contract tests, and 83 integration tests passed."
+    },
+    {
+      "command": "pnpm test:acceptance",
+      "result": "PASS",
+      "evidence": "15 of 15 Chromium tests passed, including verified, failed, unverified, wrong-lineage, tampered, and stale Results states."
+    },
+    {
+      "command": "pnpm --filter @moonshift/web build",
+      "result": "PASS",
+      "evidence": "Vite production build completed successfully."
+    },
+    {
+      "command": "node scripts/generate-contract-types.mjs --check",
+      "result": "PASS",
+      "evidence": "Generated TypeScript derivatives reproduce from the approved OpenAPI and runner protocol contracts."
+    },
+    {
+      "command": "git diff --check",
+      "result": "PASS",
+      "evidence": "No whitespace errors."
+    },
+    {
+      "command": "$speckit-converge bounded to T047-T057",
+      "result": "PASS",
+      "evidence": "The five US3 acceptance scenarios, bounded specification, plan and data-model decisions, tasks, implementation, tests, and evidence contain no remaining actionable gap; no task was appended and T058+ was not evaluated as current work."
+    }
+  ],
+  "ruleMatrixEvidence": {
+    "passing": "A complete artifact-integrity, build, test, requirement-coverage, independent-review, blocking-findings, and configured human-approval set at the expected revision is the only fixture outcome that reaches PASSED and VERIFIED.",
+    "blocking": "Missing, failing, mismatched-revision, tampered, blocking-finding, and same-lineage evidence remains non-verified with explicit per-rule remediation.",
+    "staleInputs": [
+      "verification policy or rule version",
+      "expected Git revision",
+      "evidence membership",
+      "evidence source hashes",
+      "published artifact bytes",
+      "project pause before verification commit"
+    ],
+    "claimBoundary": "Artifact publication and an author claim stop at CLAIMED_COMPLETE; only the Verification Engine may perform VERIFYING to VERIFIED.",
+    "pauseResumeBoundary": "PAUSE atomically marks every EVALUATING snapshot STALE before PAUSED. RESUME mints successor authority and automatically evaluates one fresh immutable snapshot; no PASSED commit can cross a later PAUSE."
+  },
+  "artifactEvidence": {
+    "artifactId": "025336dc-28c7-5b96-9629-fa70aa1a09fc",
+    "contentHash": "sha256:eef929bd26e81d14d7ba16fe90e8c3c94263821b8ccec555938bbbdef37428c1",
+    "sizeBytes": 274,
+    "gitRevision": "857f0f9b02210000000000000000000000000000",
+    "snapshotMaterialHash": "sha256:26e90af6063f5c7c507ed04b93354f607bb780d4804b50a96ae0a047a89b2c31",
+    "storage": "Owner-local content-addressed filesystem with stable metadata identity",
+    "commitIntegrityRead": "The physical bytes are reread and hash-verified immediately inside verification compare-and-commit."
+  },
+  "qualityLineageEvidence": {
+    "authorAgentId": "682a7e6f-0000-4000-8000-000000000018",
+    "authorLineageId": "722a8e2d-0000-4000-8000-000000000012",
+    "reviewerAgentId": "732a8fc0-0000-4000-8000-000000000013",
+    "reviewerLineageId": "6c2a84bb-0000-4000-8000-000000000014",
+    "independent": true,
+    "decision": "PASSED",
+    "taskState": "VERIFIED"
+  },
+  "persistenceEvidence": {
+    "migration": "003_verification.sql",
+    "records": "Artifact metadata, evidence, policies, ordered rules, evaluations, immutable snapshots, reviewer lineage, and revision bindings persist transactionally with the Project aggregate.",
+    "compareAndCommit": "PostgreSQL project serialization validates policy, revision, membership, source hashes, physical artifact integrity, and Project control state before a decision is committed.",
+    "publicationRecovery": "A deterministic stable artifact identity converges filesystem publication after a database rollback without orphaning or duplicating metadata.",
+    "resumeRecovery": "The production HTTP RESUME path reuses an interrupted EVALUATING snapshot or creates exactly one deterministic fresh evaluation for a prior STALE snapshot."
+  },
+  "resultsEvidence": {
+    "truthfulness": "The Results projection derives task, artifact, evidence, reviewer lineage, descriptor provenance, execution state, blocking reasons, and ordered audit data from durable state.",
+    "noCompletionInflation": "Only VERIFIED renders as done; claimed, verifying, failed, stale, paused, stopped, blocked, failed-project, and cancelled outcomes remain visibly distinct.",
+    "executionParity": "Every defined ExecutionState, including SUSPENDED, STOPPING, and STOPPED, round-trips through the public projection without collapsing control semantics."
+  },
+  "idempotencyAndConcurrencyEvidence": {
+    "verificationCommit": "Commit idempotency is bound to the immutable project and evaluation identity; correlation identifiers remain trace metadata and do not split a semantic replay.",
+    "concurrentResume": "Two concurrent HTTP RESUME deliveries with one semantic idempotency key and different correlation identities both return the original accepted result, create one fresh evaluation, and emit one PASSED decision.",
+    "pauseSupersession": "A typed supersession error is swallowed only after durable reread proves that the same evaluation became STALE; divergent failures remain visible."
+  },
+  "independentReview": {
+    "actionableReview": "us3_review",
+    "repairAndFinalReview": "us3_final_review",
+    "finalResult": "PASS_NO_SUBSTANTIVE_FINDINGS",
+    "reviewedRisks": "Claim authority, independent lineage, immutable evidence and physical artifact integrity, PostgreSQL rollback recovery, pause/resume serialization, successor execution legality, automatic reevaluation, semantic replay, Results truthfulness, contract parity, and browser completion inflation."
+  },
+  "safety": {
+    "realProviderUsed": false,
+    "providerCredentialUsed": false,
+    "unrestrictedShellUsed": false,
+    "externalNetworkEffectPerformed": false,
+    "simulatedSensitiveFixtureEffectPerformed": true,
+    "realSensitiveEffectPerformed": false,
+    "productionMutationPerformed": false,
+    "remoteGitMutationPerformed": false,
+    "verificationClaimed": true
+  }
+}
