@@ -1,0 +1,15 @@
+{
+  "name": "@moonshift/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "moonshift": "./dist/main.js"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@moonshift/contracts": "workspace:*"
+  }
+}

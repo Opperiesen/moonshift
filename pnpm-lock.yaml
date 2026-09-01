@@ -9,6 +9,9 @@ catalogs:
     '@vitejs/plugin-react':
       specifier: 6.1.1
       version: 6.1.1
+    ajv:
+      specifier: 8.20.0
+      version: 8.20.0
     fastify:
       specifier: 5.12.1
       version: 5.12.1
@@ -27,6 +30,9 @@ catalogs:
     vite:
       specifier: 8.2.2
       version: 8.2.2
+    yaml:
+      specifier: 2.9.0
+      version: 2.9.0
 
 importers:
 
@@ -90,6 +96,12 @@ importers:
       yaml:
         specifier: 2.9.0
         version: 2.9.0
+
+  apps/cli:
+    dependencies:
+      '@moonshift/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
 
   apps/control-plane:
     dependencies:
@@ -162,7 +174,14 @@ importers:
 
   packages/context: {}
 
-  packages/contracts: {}
+  packages/contracts:
+    dependencies:
+      ajv:
+        specifier: 'catalog:'
+        version: 8.20.0
+      yaml:
+        specifier: 'catalog:'
+        version: 2.9.0
 
   packages/domain: {}
 

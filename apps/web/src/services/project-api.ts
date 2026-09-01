@@ -98,6 +98,10 @@ export interface ResultArtifactView {
 
 export interface ResultEvidenceView {
   readonly evidenceId: string;
+  readonly projectId: string;
+  readonly taskId: string;
+  readonly executionId: string | null;
+  readonly artifactId: string | null;
   readonly producerAgentId: string;
   readonly type:
     'BUILD' | 'TEST' | 'INTEGRITY' | 'COVERAGE' | 'REVIEW' | 'APPROVAL' | 'RECONCILIATION';
@@ -122,11 +126,14 @@ export interface ResultView {
   readonly approvals: readonly ApprovalView[];
   readonly executions: readonly {
     readonly executionId: string;
+    readonly projectId: string;
+    readonly taskId: string;
     readonly agentId: string;
     readonly runtimeId: string;
     readonly backendConnectionId: string;
     readonly modelDescriptorId: string;
     readonly modelDescriptorVersion: number;
+    readonly routeDecisionId: string;
     readonly state: string;
     readonly attemptNumber: number;
     readonly startedAt: string;
@@ -134,13 +141,18 @@ export interface ResultView {
   }[];
   readonly checkpoints: readonly {
     readonly checkpointId: string;
+    readonly projectId: string;
+    readonly taskId: string;
     readonly executionId: string;
+    readonly reason: string;
     readonly schemaVersion: string;
     readonly contentHash: `sha256:${string}`;
     readonly gitRevision: string;
     readonly createdAt: string;
   }[];
-  readonly effects: SupervisionView['effects'];
+  readonly effects: readonly (SupervisionView['effects'][number] & {
+    readonly projectId: string;
+  })[];
   readonly organizationLineage: {
     readonly authorAgentId: string;
     readonly authorLineageId: string;
@@ -148,8 +160,14 @@ export interface ResultView {
     readonly reviewerLineageId: string | null;
     readonly independentReview: boolean;
   };
+  readonly blockedReasons: readonly string[];
+  readonly recovery: SupervisionView['recovery'];
   readonly audit: readonly {
     readonly auditEventId: string;
+    readonly projectEventId: string;
+    readonly supervisionSequence: number | null;
+    readonly projectId: string;
+    readonly taskId: string;
     readonly sequence: number;
     readonly actorType: string;
     readonly actorId: string;
@@ -338,13 +356,14 @@ export async function replayEvents(
         .map((line) => line.slice(5).trim())
         .join('\n');
       if (data) {
+        let decoded: ProjectEvent | { readonly code?: string };
         try {
-          const decoded = JSON.parse(data) as ProjectEvent | { readonly code?: string };
-          if ('code' in decoded && decoded.code === 'EVENT_CURSOR_EXPIRED') return 'expired';
-          onEvent(decoded as ProjectEvent);
+          decoded = JSON.parse(data) as ProjectEvent | { readonly code?: string };
         } catch {
-          /* malformed events are ignored */
+          continue;
         }
+        if ('code' in decoded && decoded.code === 'EVENT_CURSOR_EXPIRED') return 'expired';
+        onEvent(decoded as ProjectEvent);
       }
     }
   }

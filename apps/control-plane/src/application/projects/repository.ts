@@ -5,6 +5,8 @@ import {
   type ExecutionState,
   type PresenceSourceType,
   type PresenceState,
+  type ProjectState,
+  type TaskState,
 } from '@moonshift/contracts';
 import { transitionExecution } from '@moonshift/domain';
 
@@ -14,6 +16,7 @@ import {
   ProjectVersionConflictError,
 } from '../../errors.js';
 import type { ProjectEvent, ProjectRecord } from '../../model.js';
+import { synchronizeResultHistory } from './result-history.js';
 
 export interface CreateProjectRecordInput {
   readonly idempotencyKey: string;
@@ -164,7 +167,10 @@ export class InMemoryProjectRepository implements ProjectRepository {
       if (record === undefined) throw new Error('Idempotency record has no project');
       return { reused: true, record };
     }
-    const record = await input.build(this.capacitySnapshot(this.authorityClock().toISOString()));
+    const record = synchronizeResultHistory(
+      null,
+      await input.build(this.capacitySnapshot(this.authorityClock().toISOString())),
+    );
     const projectId = record.view.projectId;
     if (this.projects.has(projectId)) throw new Error('Project identity already exists');
     this.projects.set(projectId, record);
@@ -294,19 +300,20 @@ export class InMemoryProjectRepository implements ProjectRepository {
           ? this.capacitySnapshot(authorityNow)
           : undefined,
       );
+      const record = synchronizeResultHistory(current, changed.record);
       if (
-        changed.record.view.projectId !== input.projectId ||
-        changed.record.view.version !== current.view.version + 1 ||
-        changed.record.view.lastSequence < current.view.lastSequence
+        record.view.projectId !== input.projectId ||
+        record.view.version !== current.view.version + 1 ||
+        record.view.lastSequence < current.view.lastSequence
       ) {
         throw new Error('Project mutation did not preserve identity and monotonic versions');
       }
-      this.projects.set(input.projectId, changed.record);
+      this.projects.set(input.projectId, record);
       this.commandIdempotency.set(key, {
         requestHash: input.requestHash,
         response: changed.response,
       });
-      return { reused: false, response: changed.response, record: changed.record };
+      return { reused: false, response: changed.response, record };
     } finally {
       release();
     }
@@ -369,6 +376,36 @@ export class InMemoryProjectRepository implements ProjectRepository {
       CANCELLED: ['CANCELLED'],
       LOST: ['STARTING', 'LOST'],
       RECONCILING: ['STARTING', 'LOST', 'RECONCILING'],
+    };
+    const projectStates: Record<ExecutionState, ProjectState> = {
+      QUEUED: 'ACTIVE',
+      STARTING: 'ACTIVE',
+      RUNNING: 'ACTIVE',
+      WAITING_FOR_APPROVAL: 'ACTIVE',
+      CHECKPOINTING: 'ACTIVE',
+      SUSPENDED: 'PAUSED',
+      STOPPING: 'STOPPING',
+      STOPPED: 'STOPPED',
+      SUCCEEDED: 'ACTIVE',
+      FAILED: 'FAILED',
+      CANCELLED: 'CANCELLED',
+      LOST: 'BLOCKED',
+      RECONCILING: 'BLOCKED',
+    };
+    const taskStates: Record<ExecutionState, TaskState> = {
+      QUEUED: 'QUEUED',
+      STARTING: 'RUNNING',
+      RUNNING: 'RUNNING',
+      WAITING_FOR_APPROVAL: 'WAITING_FOR_APPROVAL',
+      CHECKPOINTING: 'RUNNING',
+      SUSPENDED: 'RUNNING',
+      STOPPING: 'RUNNING',
+      STOPPED: 'BLOCKED',
+      SUCCEEDED: 'CLAIMED_COMPLETE',
+      FAILED: 'FAILED',
+      CANCELLED: 'CANCELLED',
+      LOST: 'BLOCKED',
+      RECONCILING: 'BLOCKED',
     };
     const executionId = randomUUID();
     const actorId = randomUUID();
@@ -436,32 +473,39 @@ export class InMemoryProjectRepository implements ProjectRepository {
     }
     for (const event of events) planningValidators().eventEnvelope.assert(event);
     const lastSequence = events.at(-1)?.sequence ?? record.view.lastSequence;
-    this.projects.set(
-      projectId,
-      Object.freeze({
-        ...record,
-        view: Object.freeze({ ...record.view, lastSequence }),
-        scheduling: Object.freeze({
-          ...record.scheduling,
-          execution: Object.freeze({
-            ...record.scheduling.execution,
-            executionId,
-            state: execution.state,
-          }),
-          runtime: Object.freeze({ ...record.scheduling.runtime, executionId }),
-        }),
-        supervision: Object.freeze({
-          ...record.supervision,
-          authority: Object.freeze({
-            ...record.supervision.authority,
-            executionId,
-            executionAttempt: record.supervision.authority.executionAttempt + 1,
-            executionState: execution.state,
-          }),
-        }),
-        events: Object.freeze([...record.events, ...events]),
+    const changed = Object.freeze({
+      ...record,
+      view: Object.freeze({
+        ...record.view,
+        status: projectStates[state],
+        tasks: Object.freeze(
+          record.view.tasks.map((task, index) =>
+            index === 0 ? Object.freeze({ ...task, state: taskStates[state] }) : task,
+          ),
+        ),
+        lastSequence,
       }),
-    );
+      scheduling: Object.freeze({
+        ...record.scheduling,
+        execution: Object.freeze({
+          ...record.scheduling.execution,
+          executionId,
+          state: execution.state,
+        }),
+        runtime: Object.freeze({ ...record.scheduling.runtime, executionId }),
+      }),
+      supervision: Object.freeze({
+        ...record.supervision,
+        authority: Object.freeze({
+          ...record.supervision.authority,
+          executionId,
+          executionAttempt: record.supervision.authority.executionAttempt + 1,
+          executionState: execution.state,
+        }),
+      }),
+      events: Object.freeze([...record.events, ...events]),
+    });
+    this.projects.set(projectId, synchronizeResultHistory(record, changed));
   }
 
   setFixtureEffectState(

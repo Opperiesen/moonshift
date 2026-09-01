@@ -393,6 +393,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ResultView"
+        "401":
+          $ref: "#/components/responses/Problem"
         "404":
           $ref: "#/components/responses/Problem"
 components:
@@ -968,7 +970,7 @@ components:
     ResultView:
       type: object
       additionalProperties: false
-      required: [projectId, projectState, task, artifacts, evidence, approvals, executions, checkpoints, effects, organizationLineage, audit, verified]
+      required: [projectId, projectState, task, artifacts, evidence, approvals, executions, checkpoints, effects, organizationLineage, blockedReasons, recovery, audit, verified]
       properties:
         projectId:
           type: string
@@ -1003,6 +1005,12 @@ components:
             $ref: "#/components/schemas/EffectView"
         organizationLineage:
           $ref: "#/components/schemas/OrganizationLineageView"
+        blockedReasons:
+          type: array
+          items:
+            type: string
+        recovery:
+          $ref: "#/components/schemas/RecoveryView"
         audit:
           type: array
           items:
@@ -1042,11 +1050,27 @@ components:
     EvidenceView:
       type: object
       additionalProperties: false
-      required: [evidenceId, producerAgentId, type, status, observedAt, gitRevision, sourceHash]
+      required: [evidenceId, projectId, taskId, executionId, artifactId, producerAgentId, type, status, observedAt, gitRevision, sourceHash]
       properties:
         evidenceId:
           type: string
           format: uuid
+        projectId:
+          type: string
+          format: uuid
+        taskId:
+          type: string
+          format: uuid
+        executionId:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: "null"
+        artifactId:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: "null"
         producerAgentId:
           type: string
           format: uuid
@@ -1068,9 +1092,15 @@ components:
     ExecutionView:
       type: object
       additionalProperties: false
-      required: [executionId, agentId, runtimeId, backendConnectionId, modelDescriptorId, modelDescriptorVersion, state, attemptNumber, startedAt]
+      required: [executionId, projectId, taskId, agentId, runtimeId, backendConnectionId, modelDescriptorId, modelDescriptorVersion, routeDecisionId, state, attemptNumber, startedAt, endedAt]
       properties:
         executionId:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        taskId:
           type: string
           format: uuid
         agentId:
@@ -1088,6 +1118,9 @@ components:
         modelDescriptorVersion:
           type: integer
           minimum: 1
+        routeDecisionId:
+          type: string
+          format: uuid
         state:
           $ref: "#/components/schemas/ExecutionState"
         attemptNumber:
@@ -1104,14 +1137,23 @@ components:
     CheckpointView:
       type: object
       additionalProperties: false
-      required: [checkpointId, executionId, schemaVersion, contentHash, gitRevision, createdAt]
+      required: [checkpointId, projectId, taskId, executionId, reason, schemaVersion, contentHash, gitRevision, createdAt]
       properties:
         checkpointId:
+          type: string
+          format: uuid
+        projectId:
+          type: string
+          format: uuid
+        taskId:
           type: string
           format: uuid
         executionId:
           type: string
           format: uuid
+        reason:
+          type: string
+          enum: [PAUSE, STOP, RUNTIME_LOST, BACKEND_SWITCH, EFFECT_RECONCILIATION]
         schemaVersion:
           type: string
         contentHash:
@@ -1126,9 +1168,12 @@ components:
     EffectView:
       type: object
       additionalProperties: false
-      required: [effectId, taskId, actionDigest, semanticKey, state, reconciliationOutcome, groundTruthDigest, version]
+      required: [effectId, projectId, taskId, actionDigest, semanticKey, state, reconciliationOutcome, groundTruthDigest, version]
       properties:
         effectId:
+          type: string
+          format: uuid
+        projectId:
           type: string
           format: uuid
         taskId:
@@ -1180,9 +1225,23 @@ components:
     AuditEventView:
       type: object
       additionalProperties: false
-      required: [auditEventId, sequence, actorType, actorId, action, targetType, targetId, occurredAt, reason, outcome, correlationId]
+      required: [auditEventId, projectEventId, supervisionSequence, projectId, taskId, sequence, actorType, actorId, action, targetType, targetId, occurredAt, reason, outcome, correlationId]
       properties:
         auditEventId:
+          type: string
+          format: uuid
+        projectEventId:
+          type: string
+          format: uuid
+        supervisionSequence:
+          oneOf:
+            - type: integer
+              minimum: 1
+            - type: "null"
+        projectId:
+          type: string
+          format: uuid
+        taskId:
           type: string
           format: uuid
         sequence:

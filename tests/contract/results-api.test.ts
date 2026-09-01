@@ -310,6 +310,7 @@ describe('results HTTP contract', () => {
           executionId: resumedRecord.scheduling.execution.executionId,
           state: 'WAITING_FOR_APPROVAL',
         },
+        { executionId: initialExecutionId, state: 'SUSPENDED' },
       ],
     });
     const successorTransitions = (await fixture.repository.listEvents(project.projectId, 0))
@@ -344,6 +345,7 @@ describe('results HTTP contract', () => {
           executionId: resumedRecord.scheduling.execution.executionId,
           state: 'STOPPED',
         },
+        { executionId: initialExecutionId, state: 'SUSPENDED' },
       ],
     });
     await fixture.server.close();

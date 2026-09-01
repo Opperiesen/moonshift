@@ -7,7 +7,7 @@ export * from './bootstrap/index.js';
 export * from './http/index.js';
 export * from './model.js';
 export * from './projections/project-events.js';
-export * from './projections/results.js';
+export * from './projections/result-detail.js';
 export * from './projections/supervision-events.js';
 export * from './scheduler/index.js';
 export * from './scheduler/backend-switch.js';

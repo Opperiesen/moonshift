@@ -186,6 +186,26 @@ export interface SchedulingResult {
     | null;
 }
 
+export interface ResultExecutionRecord {
+  readonly executionId: string;
+  readonly taskId: string;
+  readonly agentId: string;
+  readonly runtimeId: string;
+  readonly backendConnectionId: string;
+  readonly modelDescriptorId: string;
+  readonly modelDescriptorVersion: number;
+  readonly routeDecisionId: string;
+  readonly state: ExecutionState;
+  readonly attemptNumber: number;
+  readonly startedAt: string;
+  readonly endedAt: string | null;
+}
+
+export interface ResultHistoryRecord {
+  readonly executions: readonly ResultExecutionRecord[];
+  readonly checkpoints: readonly ExecutionCheckpoint[];
+}
+
 export interface ProjectOrganization {
   readonly specialist: SpecialistIdentity;
   readonly delegation: CompleteDelegation;
@@ -326,5 +346,6 @@ export interface ProjectRecord {
   readonly scheduling: SchedulingResult;
   readonly supervision: SupervisionRecord;
   readonly verification: VerificationRecord;
+  readonly resultHistory?: ResultHistoryRecord;
   readonly events: readonly ProjectEvent[];
 }

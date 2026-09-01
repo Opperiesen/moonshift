@@ -14,6 +14,7 @@ import {
   InMemoryApprovedEffectExecutor,
   PostgresProjectRepository,
   ProjectService,
+  projectResults,
 } from '../../apps/control-plane/src/index.js';
 import { FixtureScheduler } from '../../apps/control-plane/src/scheduler/index.js';
 import { runMigrations } from '../../packages/persistence/src/index.js';
@@ -361,6 +362,115 @@ describe.sequential('PostgreSQL control-plane restart recovery', () => {
       }),
     ).rejects.toThrow('STALE_RUNTIME_FENCE');
     await reconciliationRestart.server.close();
+  });
+
+  it('retains pause and resume execution history across a PostgreSQL control-plane restart', async () => {
+    const initial = restartedControlPlane('us5-result-history-initial');
+    await initial.server.ready();
+    const submitted = await initial.service.submitObjective({
+      actorId: supervisorId,
+      idempotencyKey: 'us5-result-history-objective',
+      correlationId: '76000000-0000-4000-8000-000000000090',
+      objective: 'Retain complete execution and checkpoint history across process restart',
+      fixtureScenario: 'PASS',
+    });
+    const created = await initial.repository.get(submitted.view.projectId);
+    if (created === null) throw new Error('Expected durable result-history project');
+    const sourceExecutionId = created.scheduling.execution.executionId;
+    await initial.supervision.controlProject({
+      actorId: supervisorId,
+      projectId: created.view.projectId,
+      command: 'PAUSE',
+      reason: 'Persist the source execution checkpoint before restart',
+      expectedVersion: created.view.version,
+      idempotencyKey: 'us5-result-history-pause',
+      correlationId: '76000000-0000-4000-8000-000000000091',
+    });
+    const paused = await initial.repository.get(created.view.projectId);
+    if (paused === null) throw new Error('Expected paused result-history project');
+    await pool.query('SELECT pg_sleep(0.01)');
+    await initial.supervision.controlProject({
+      actorId: supervisorId,
+      projectId: created.view.projectId,
+      command: 'RESUME',
+      reason: 'Create a successor while retaining the source execution history',
+      expectedVersion: paused.view.version,
+      idempotencyKey: 'us5-result-history-resume',
+      correlationId: '76000000-0000-4000-8000-000000000092',
+    });
+    const beforeRestartRecord = await initial.repository.get(created.view.projectId);
+    if (beforeRestartRecord === null) throw new Error('Expected resumed result-history project');
+    const beforeRestart = projectResults(beforeRestartRecord);
+    const suspendedEvent = [...beforeRestartRecord.events]
+      .reverse()
+      .find(
+        ({ kind, aggregate, payload }) =>
+          kind === 'execution.state_changed' &&
+          aggregate.id === sourceExecutionId &&
+          payload.toState === 'SUSPENDED',
+      );
+    if (suspendedEvent === undefined) throw new Error('Expected durable suspension event');
+    const sourceBeforeRestart = beforeRestart.executions.find(
+      ({ executionId }) => executionId === sourceExecutionId,
+    );
+    expect(sourceBeforeRestart?.endedAt).toBe(suspendedEvent.occurredAt);
+    expect(sourceBeforeRestart?.endedAt).not.toBe(beforeRestart.executions[0]?.startedAt);
+    expect(beforeRestart.executions).toHaveLength(2);
+    expect(beforeRestart.checkpoints).toEqual([
+      expect.objectContaining({ executionId: sourceExecutionId }),
+    ]);
+    await initial.server.close();
+
+    const restarted = restartedControlPlane('us5-result-history-restarted');
+    await restarted.server.ready();
+    try {
+      const afterRestartRecord = await restarted.repository.get(created.view.projectId);
+      if (afterRestartRecord === null) throw new Error('Expected restarted result-history project');
+      const afterRestart = projectResults(afterRestartRecord);
+      expect(afterRestart.audit).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            action: 'runtime.recovered',
+            reason: 'Runtime heartbeat or process authority was lost',
+          }),
+        ]),
+      );
+      for (const execution of beforeRestart.executions) {
+        expect(
+          afterRestart.executions.find(({ executionId }) => executionId === execution.executionId),
+        ).toMatchObject({
+          executionId: execution.executionId,
+          taskId: execution.taskId,
+          agentId: execution.agentId,
+          runtimeId: execution.runtimeId,
+          backendConnectionId: execution.backendConnectionId,
+          modelDescriptorId: execution.modelDescriptorId,
+          modelDescriptorVersion: execution.modelDescriptorVersion,
+          routeDecisionId: execution.routeDecisionId,
+          attemptNumber: execution.attemptNumber,
+          startedAt: execution.startedAt,
+        });
+      }
+      for (const checkpoint of beforeRestart.checkpoints) {
+        expect(
+          afterRestart.checkpoints.find(
+            ({ checkpointId }) => checkpointId === checkpoint.checkpointId,
+          ),
+        ).toEqual(checkpoint);
+      }
+      expect(afterRestart.executions.map(({ executionId }) => executionId)).toContain(
+        sourceExecutionId,
+      );
+      expect(
+        afterRestart.executions.find(({ executionId }) => executionId === sourceExecutionId),
+      ).toMatchObject({
+        executionId: sourceExecutionId,
+        state: 'SUSPENDED',
+        endedAt: sourceBeforeRestart?.endedAt,
+      });
+    } finally {
+      await restarted.server.close();
+    }
   });
 
   it('replays stable remote recovery identities after a crash before final commit', async () => {

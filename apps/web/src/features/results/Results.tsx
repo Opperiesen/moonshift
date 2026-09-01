@@ -46,8 +46,17 @@ function integrityState(view: ResultView): 'matched' | 'mismatch' | 'pending' {
     : 'mismatch';
 }
 
+function resultStateSummary(view: ResultView): string {
+  const executionState = view.executions[0]?.state ?? 'NO_EXECUTION';
+  if (view.verified) return `VERIFIED · ${view.projectState} · ${executionState}`;
+  if (view.task.state === 'CLAIMED_COMPLETE') {
+    return `UNVERIFIED · ${view.projectState} · ${executionState}`;
+  }
+  return `${executionState} · ${view.projectState} · ${view.task.state} · Not verified`;
+}
+
 function blockingReasons(view: ResultView): readonly string[] {
-  const reasons: string[] = [];
+  const reasons: string[] = [...view.blockedReasons];
   const decision = latestVerificationDecision(view);
   if (decision?.outcome === 'STALE') reasons.push(decision.reason);
   if (view.task.state === 'CLAIMED_COMPLETE') reasons.push('Awaiting independent verification');
@@ -74,6 +83,14 @@ function blockingReasons(view: ResultView): readonly string[] {
   }
   if (view.task.state === 'VERIFYING' && reasons.length === 0) {
     reasons.push('Verification evaluation is pending');
+  }
+  if (view.projectState === 'PAUSED') reasons.push('Project is paused');
+  if (view.projectState === 'STOPPING') reasons.push('Project is stopping');
+  if (view.projectState === 'STOPPED') reasons.push('Project was stopped before verification');
+  if (view.projectState === 'FAILED') reasons.push('Project failed before verification');
+  if (view.projectState === 'CANCELLED') reasons.push('Project was cancelled');
+  if (view.projectState === 'BLOCKED' && reasons.length === 0) {
+    reasons.push('Project requires explicit remediation');
   }
   if (view.task.state === 'BLOCKED' && reasons.length === 0) {
     reasons.push('Verification policy did not pass');
@@ -113,9 +130,12 @@ export function Results({ projectId }: { readonly projectId: string }) {
       </button>
 
       {view !== undefined && (
-        <>
+        <section aria-labelledby="result-records-heading">
+          <h2 id="result-records-heading">Result records</h2>
+
           <section aria-labelledby="result-summary-heading">
-            <h2 id="result-summary-heading">Verification summary</h2>
+            <h3 id="result-summary-heading">Result summary</h3>
+            <p data-testid="result-state-summary">{resultStateSummary(view)}</p>
             <p>
               Project control state: <strong>{label(view.projectState)}</strong>
             </p>
@@ -124,6 +144,13 @@ export function Results({ projectId }: { readonly projectId: string }) {
               <strong data-testid="verification-state">{verificationState(view)}</strong>
             </p>
             <p data-testid="verified-flag">Verified: {view.verified ? 'Yes' : 'No'}</p>
+            <p data-testid="recovery-summary">
+              Recovery: {label(view.recovery.state)} · {view.recovery.progress}
+            </p>
+            <p>
+              Task <code>{view.task.taskId}</code> · assignee{' '}
+              <code>{view.task.assigneeAgentId ?? 'Unassigned'}</code>
+            </p>
             <p>
               Expected revision: <code>{view.task.expectedRevision}</code>
             </p>
@@ -136,14 +163,16 @@ export function Results({ projectId }: { readonly projectId: string }) {
             </p>
             <div data-testid="reviewer-lineage">
               <p>
-                Author lineage: <code>{view.organizationLineage.authorLineageId}</code>
+                Author agent <code>{view.organizationLineage.authorAgentId}</code> · lineage{' '}
+                <code>{view.organizationLineage.authorLineageId}</code>
               </p>
               {view.organizationLineage.reviewerAgentId === null ? (
                 <p>Reviewer not assigned</p>
               ) : (
                 <>
                   <p>
-                    Reviewer lineage: <code>{view.organizationLineage.reviewerLineageId}</code>
+                    Reviewer agent <code>{view.organizationLineage.reviewerAgentId}</code> · lineage{' '}
+                    <code>{view.organizationLineage.reviewerLineageId}</code>
                   </p>
                   <p>
                     Independent review: {view.organizationLineage.independentReview ? 'Yes' : 'No'}
@@ -152,7 +181,7 @@ export function Results({ projectId }: { readonly projectId: string }) {
               )}
             </div>
             <div data-testid="blocking-reasons">
-              <h3>Blocking reasons</h3>
+              <h4>Blocking reasons</h4>
               {blockers.length === 0 ? (
                 <p>No blocking reasons</p>
               ) : (
@@ -166,13 +195,15 @@ export function Results({ projectId }: { readonly projectId: string }) {
           </section>
 
           <section aria-labelledby="artifacts-heading">
-            <h2 id="artifacts-heading">Artifacts</h2>
+            <h3 id="artifacts-heading">Artifacts</h3>
             {artifact === undefined ? (
               <p>No artifact published.</p>
             ) : (
               <table aria-label="Artifacts">
                 <thead>
                   <tr>
+                    <th scope="col">Artifact</th>
+                    <th scope="col">Task / execution</th>
                     <th scope="col">Kind</th>
                     <th scope="col">Content hash</th>
                     <th scope="col">Revision</th>
@@ -182,6 +213,12 @@ export function Results({ projectId }: { readonly projectId: string }) {
                 <tbody>
                   {view.artifacts.map((item) => (
                     <tr key={item.artifactId}>
+                      <th scope="row">
+                        <code>{item.artifactId}</code>
+                      </th>
+                      <td>
+                        <code>{item.taskId}</code> / <code>{item.executionId}</code>
+                      </td>
                       <td>{item.kind}</td>
                       <td>
                         <code>{item.contentHash}</code>
@@ -198,12 +235,13 @@ export function Results({ projectId }: { readonly projectId: string }) {
           </section>
 
           <section aria-labelledby="evidence-heading">
-            <h2 id="evidence-heading">Evidence</h2>
+            <h3 id="evidence-heading">Evidence</h3>
             <table aria-label="Evidence matrix">
               <thead>
                 <tr>
-                  <th scope="col">Rule</th>
-                  <th scope="col">Outcome</th>
+                  <th scope="col">Evidence</th>
+                  <th scope="col">Rule / outcome</th>
+                  <th scope="col">Artifact / execution</th>
                   <th scope="col">Producer</th>
                   <th scope="col">Revision</th>
                   <th scope="col">Source hash</th>
@@ -212,8 +250,16 @@ export function Results({ projectId }: { readonly projectId: string }) {
               <tbody>
                 {view.evidence.map((item) => (
                   <tr key={item.evidenceId}>
-                    <th scope="row">{item.type}</th>
-                    <td>{item.status}</td>
+                    <th scope="row">
+                      <code>{item.evidenceId}</code>
+                    </th>
+                    <td>
+                      {item.type} / {item.status}
+                    </td>
+                    <td>
+                      <code>{item.artifactId ?? 'No artifact'}</code> /{' '}
+                      <code>{item.executionId ?? 'No execution'}</code>
+                    </td>
                     <td>
                       <code>{item.producerAgentId}</code>
                     </td>
@@ -227,7 +273,7 @@ export function Results({ projectId }: { readonly projectId: string }) {
                 ))}
                 {view.evidence.length === 0 && (
                   <tr>
-                    <td colSpan={5}>No evidence recorded.</td>
+                    <td colSpan={6}>No evidence recorded.</td>
                   </tr>
                 )}
               </tbody>
@@ -235,70 +281,118 @@ export function Results({ projectId }: { readonly projectId: string }) {
           </section>
 
           <section aria-labelledby="approvals-heading">
-            <h2 id="approvals-heading">Approval history</h2>
+            <h3 id="approvals-heading">Approval history</h3>
             {view.approvals.length === 0 ? (
               <p>No approvals recorded.</p>
             ) : (
               <ol>
                 {view.approvals.map((approval) => (
                   <li key={approval.approvalId}>
-                    {label(approval.state)} · {approval.reason} ·{' '}
-                    <code>{approval.actionDigest}</code>
+                    <code>{approval.approvalId}</code> · task <code>{approval.taskId}</code> ·{' '}
+                    requester <code>{approval.requesterAgentId}</code> · {label(approval.state)} ·{' '}
+                    {approval.reason} · <code>{approval.actionDigest}</code>
+                    {approval.decidedAt === null ? null : (
+                      <>
+                        {' '}
+                        · decided <time dateTime={approval.decidedAt}>
+                          {approval.decidedAt}
+                        </time> by <code>{approval.decisionActorId}</code>
+                      </>
+                    )}
                   </li>
                 ))}
               </ol>
             )}
           </section>
 
-          <section aria-labelledby="executions-heading">
-            <h2 id="executions-heading">Backend executions</h2>
+          <section aria-labelledby="executions-heading" data-testid="execution-provenance">
+            <h3 id="executions-heading">Backend execution history</h3>
             {view.executions.map((execution) => (
               <article key={execution.executionId}>
-                <h3>{label(execution.state)}</h3>
+                <h4>
+                  Attempt {execution.attemptNumber}: {execution.state}
+                </h4>
                 <p>
-                  Connection <code>{execution.backendConnectionId}</code> · descriptor{' '}
+                  Execution <code>{execution.executionId}</code> · task{' '}
+                  <code>{execution.taskId}</code> · agent <code>{execution.agentId}</code> · runtime{' '}
+                  <code>{execution.runtimeId}</code>
+                </p>
+                <p>
+                  Connection <code>{execution.backendConnectionId}</code> · model descriptor{' '}
                   <code>{execution.modelDescriptorId}</code> v{execution.modelDescriptorVersion} ·
-                  attempt {execution.attemptNumber}
+                  route decision <code>{execution.routeDecisionId}</code>
+                </p>
+                <p>
+                  Started <time dateTime={execution.startedAt}>{execution.startedAt}</time>
+                  {execution.endedAt === null ? null : (
+                    <>
+                      {' '}
+                      · ended <time dateTime={execution.endedAt}>{execution.endedAt}</time>
+                    </>
+                  )}
                 </p>
               </article>
             ))}
           </section>
 
           <section aria-labelledby="checkpoints-heading">
-            <h2 id="checkpoints-heading">Checkpoints and effects</h2>
+            <h3 id="checkpoints-heading">Checkpoint and effect history</h3>
             {view.checkpoints.length === 0 ? (
               <p>No checkpoint recorded.</p>
             ) : (
-              <ul>
+              <ol>
                 {view.checkpoints.map((checkpoint) => (
                   <li key={checkpoint.checkpointId}>
-                    Checkpoint {checkpoint.schemaVersion} · <code>{checkpoint.contentHash}</code> ·{' '}
-                    {checkpoint.createdAt}
+                    <code>{checkpoint.checkpointId}</code> · {checkpoint.reason} · execution{' '}
+                    <code>{checkpoint.executionId}</code> · task <code>{checkpoint.taskId}</code> ·
+                    revision <code>{checkpoint.gitRevision}</code> · checkpoint{' '}
+                    {checkpoint.schemaVersion} <code>{checkpoint.contentHash}</code> ·{' '}
+                    <time dateTime={checkpoint.createdAt}>{checkpoint.createdAt}</time>
                   </li>
                 ))}
-              </ul>
+              </ol>
             )}
-            <ul>
-              {view.effects.map((effect) => (
-                <li key={effect.effectId}>
-                  Effect {label(effect.state)} · <code>{effect.actionDigest}</code>
-                </li>
-              ))}
-            </ul>
+            {view.effects.length === 0 ? (
+              <p>No external effects recorded.</p>
+            ) : (
+              <ol>
+                {view.effects.map((effect) => (
+                  <li key={effect.effectId}>
+                    Effect <code>{effect.effectId}</code> · task <code>{effect.taskId}</code> ·{' '}
+                    {label(effect.state)} · <code>{effect.actionDigest}</code> · semantic key{' '}
+                    <code>{effect.semanticKey}</code>
+                    {effect.reconciliationOutcome === null
+                      ? null
+                      : ` · ${effect.reconciliationOutcome}`}
+                  </li>
+                ))}
+              </ol>
+            )}
           </section>
 
           <section aria-labelledby="audit-heading">
-            <h2 id="audit-heading">Audit timeline</h2>
+            <h3 id="audit-heading">Audit timeline</h3>
             <ol>
               {view.audit.map((item) => (
-                <li key={item.auditEventId}>
-                  {item.sequence}. {item.occurredAt} · {item.actorType} · {item.action} ·{' '}
-                  {item.outcome}
+                <li
+                  key={item.auditEventId}
+                  data-sequence={item.sequence}
+                  data-event-id={item.auditEventId}
+                >
+                  {item.sequence}. <code>{item.auditEventId}</code> · project event{' '}
+                  <code>{item.projectEventId}</code>
+                  {item.supervisionSequence === null
+                    ? null
+                    : ` · supervision sequence ${item.supervisionSequence}`}{' '}
+                  · <time dateTime={item.occurredAt}>{item.occurredAt}</time> · {item.actorType}{' '}
+                  <code>{item.actorId}</code> · {item.action} · {item.targetType}{' '}
+                  <code>{item.targetId}</code> · task <code>{item.taskId}</code> · {item.reason} ·{' '}
+                  {item.outcome} · correlation <code>{item.correlationId}</code>
                 </li>
               ))}
             </ol>
           </section>
-        </>
+        </section>
       )}
     </main>
   );

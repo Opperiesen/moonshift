@@ -8,5 +8,9 @@
       "types": "./src/index.ts",
       "default": "./dist/index.js"
     }
+  },
+  "dependencies": {
+    "ajv": "catalog:",
+    "yaml": "catalog:"
   }
 }

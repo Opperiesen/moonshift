@@ -16,6 +16,7 @@ import type {
   RuntimeHeartbeatInput,
   RuntimeHeartbeatResult,
 } from './repository.js';
+import { synchronizeResultHistory } from './result-history.js';
 
 async function transaction<T>(pool: Pool, work: (client: PoolClient) => Promise<T>): Promise<T> {
   const client = await pool.connect();
@@ -215,7 +216,10 @@ export class PostgresProjectRepository implements ProjectRepository {
         if (snapshot === undefined) throw new Error('Idempotency record has no project');
         return { reused: true, record: snapshot };
       }
-      const record = await input.build(await capacitySnapshot(client));
+      const record = synchronizeResultHistory(
+        null,
+        await input.build(await capacitySnapshot(client)),
+      );
       const projectId = record.view.projectId;
       await client.query(
         `INSERT INTO project_snapshots (project_id, version, record)
@@ -439,33 +443,34 @@ export class PostgresProjectRepository implements ProjectRepository {
         ).rows[0]?.authority_now;
       if (authorityNow === undefined) throw new Error('PostgreSQL authority clock unavailable');
       const changed = await input.mutate(current.record, authorityNow, capacity);
+      const record = synchronizeResultHistory(current.record, changed.record);
       if (
-        changed.record.view.projectId !== input.projectId ||
-        changed.record.view.version !== current.version + 1 ||
-        changed.record.view.lastSequence < current.record.view.lastSequence
+        record.view.projectId !== input.projectId ||
+        record.view.version !== current.version + 1 ||
+        record.view.lastSequence < current.record.view.lastSequence
       ) {
         throw new Error('Project mutation did not preserve identity and monotonic versions');
       }
-      await persistVerificationRecords(client, changed.record.verification);
+      await persistVerificationRecords(client, record.verification);
       await client.query(
         `UPDATE project_snapshots
          SET version = $2, record = $3, updated_at = clock_timestamp()
          WHERE project_id = $1`,
-        [input.projectId, changed.record.view.version, changed.record],
+        [input.projectId, record.view.version, record],
       );
-      for (const event of changed.record.events.filter(
+      for (const event of record.events.filter(
         ({ sequence }) => sequence > current.record.view.lastSequence,
       )) {
         await persistProjectEvent(client, event);
       }
-      await syncExecutionQueue(client, changed.record);
-      await syncRuntimeLease(client, changed.record);
+      await syncExecutionQueue(client, record);
+      await syncRuntimeLease(client, record);
       await client.query(
         `INSERT INTO idempotency_records (scope, idempotency_key, request_hash, response)
          VALUES ($1, $2, $3, $4)`,
         [input.scope, input.idempotencyKey, input.requestHash, changed.response],
       );
-      return { reused: false, response: changed.response, record: changed.record };
+      return { reused: false, response: changed.response, record };
     });
     await drainProjectOutbox({
       pool: this.pool,

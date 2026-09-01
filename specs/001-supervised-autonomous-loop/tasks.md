@@ -204,15 +204,15 @@ record is consistently linked and ordered, and no failed/blocked/cancelled state
 
 ### Tests for User Story 5
 
-- [ ] T069 [P] [US5] Add result-projection integration tests for stable links, complete connection/model ID/version provenance, exact ExecutionState parity, replay order, expired-cursor ProjectView presence reload, and suspended/stopping/stopped/unverified/failed/cancelled state truthfulness in `tests/integration/result-projection.test.ts`
-- [ ] T070 [P] [US5] Add end-to-end browser acceptance for the complete Results surface after reconnect and projection reload in `tests/acceptance/results-audit.spec.ts`
+- [x] T069 [P] [US5] Add result-projection integration tests for stable links, complete connection/model ID/version provenance, exact ExecutionState parity, replay order, expired-cursor ProjectView presence reload, and suspended/stopping/stopped/unverified/failed/cancelled state truthfulness in `tests/integration/result-projection.test.ts`
+- [x] T070 [P] [US5] Add end-to-end browser acceptance for the complete Results surface after reconnect and projection reload in `tests/acceptance/results-audit.spec.ts`
 
 ### Implementation for User Story 5
 
-- [ ] T071 [US5] Implement the complete result read model linking task, artifact, evidence, approvals, executions, checkpoints, effects, organization, and audit records in `apps/control-plane/src/projections/result-detail.ts`
-- [ ] T072 [US5] Implement cursor-expiry fallback and client-side event deduplication/projection refresh in `apps/web/src/services/project-events.ts`
-- [ ] T073 [US5] Complete the accessible Results audit timeline, execution/checkpoint history, approval history, and real terminal-state summaries in `apps/web/src/features/results/`
-- [ ] T074 [US5] Add the CLI project inspection/export command using the same read contract in `apps/cli/src/commands/project-inspect.ts`
+- [x] T071 [US5] Implement the complete result read model linking task, artifact, evidence, approvals, executions, checkpoints, effects, organization, and audit records in `apps/control-plane/src/projections/result-detail.ts`
+- [x] T072 [US5] Implement cursor-expiry fallback and client-side event deduplication/projection refresh in `apps/web/src/services/project-events.ts`
+- [x] T073 [US5] Complete the accessible Results audit timeline, execution/checkpoint history, approval history, and real terminal-state summaries in `apps/web/src/features/results/`
+- [x] T074 [US5] Add the CLI project inspection/export command using the same read contract in `apps/cli/src/commands/project-inspect.ts`
 - [ ] T075 [US5] Run the independent US5 tests and record linked-record, ordering, reconnect, accessibility, and state-truthfulness evidence in `evidence/001-supervised-autonomous-loop/us5/manifest.json`
 
 **Checkpoint**: All five stories are independently accepted and compose into the reference browser

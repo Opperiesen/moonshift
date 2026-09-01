@@ -1,5 +1,4 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 
 import {
   Ajv2020,
@@ -7,6 +6,7 @@ import {
   type ErrorObject,
   type ValidateFunction,
 } from 'ajv/dist/2020.js';
+import { parse as parseYaml } from 'yaml';
 
 export interface OwnedValidator {
   readonly schema: AnySchemaObject;
@@ -19,6 +19,7 @@ export interface PlanningValidators {
   readonly executionCheckpoint: OwnedValidator;
   readonly executionBackend: OwnedValidator;
   readonly runnerProtocol: OwnedValidator;
+  readonly resultView: OwnedValidator;
 }
 
 const UUID_FORMAT = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -111,8 +112,19 @@ function createAjv(): Ajv2020 {
 }
 
 function loadSchema(filename: string): AnySchemaObject {
-  const path = resolve(process.cwd(), 'specs/001-supervised-autonomous-loop/contracts', filename);
-  return JSON.parse(readFileSync(path, 'utf8')) as AnySchemaObject;
+  const url = new URL(
+    `../../../specs/001-supervised-autonomous-loop/contracts/${filename}`,
+    import.meta.url,
+  );
+  return JSON.parse(readFileSync(url, 'utf8')) as AnySchemaObject;
+}
+
+function loadYamlSchema(filename: string): AnySchemaObject {
+  const url = new URL(
+    `../../../specs/001-supervised-autonomous-loop/contracts/${filename}`,
+    import.meta.url,
+  );
+  return parseYaml(readFileSync(url, 'utf8')) as AnySchemaObject;
 }
 
 function formatErrors(errors: ErrorObject[] | null | undefined): string {
@@ -135,11 +147,16 @@ function compile(ajv: Ajv2020, schema: AnySchemaObject): OwnedValidator {
 
 export function createPlanningValidators(): PlanningValidators {
   const ajv = createAjv();
+  const resultAjv = createAjv();
+  resultAjv.addSchema(loadYamlSchema('http-api.openapi.yaml'), 'moonshift-http-api');
   return Object.freeze({
     eventEnvelope: compile(ajv, loadSchema('event-envelope.schema.json')),
     executionCheckpoint: compile(ajv, loadSchema('execution-checkpoint.schema.json')),
     executionBackend: compile(ajv, loadSchema('execution-backend.schema.json')),
     runnerProtocol: compile(ajv, loadSchema('runner-protocol.schema.json')),
+    resultView: compile(resultAjv, {
+      $ref: 'moonshift-http-api#/components/schemas/ResultView',
+    }),
   });
 }
 

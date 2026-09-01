@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  getProject,
-  type ProjectEvent,
-  type ProjectView,
-  replayEvents,
-} from '../../services/project-api.js';
+
+import { getProject, type ProjectEvent, type ProjectView } from '../../services/project-api.js';
+import { followProjectEvents } from '../../services/project-events.js';
 
 const label = (value: unknown) =>
   String(value ?? '')
@@ -14,59 +11,30 @@ const label = (value: unknown) =>
 
 export function Observe({ initial }: { initial: ProjectView }) {
   const [view, setView] = useState(initial);
-  const [activity, setActivity] = useState<ProjectEvent[]>([]);
+  const [activity, setActivity] = useState<readonly ProjectEvent[]>([]);
   const [connection, setConnection] = useState('Live');
   const stream = useRef<AbortController | null>(null);
   const projectId = view.projectId;
-  const add = useCallback(
-    (event: ProjectEvent) =>
-      setActivity((old) => {
-        const sequence = event.sequence;
-        if (sequence) sessionStorage.setItem('moonshift:last-sequence', String(sequence));
-        if (old.some((item) => item.eventId === event.eventId || item.sequence === sequence))
-          return old;
-        return [...old, event].sort((a, b) => a.sequence - b.sequence);
-      }),
-    [],
-  );
   const reconnect = useCallback(async () => {
     stream.current?.abort();
     const controller = new AbortController();
     stream.current = controller;
-    const stored = sessionStorage.getItem('moonshift:last-sequence');
-    let cursor = stored === null ? 0 : Number(stored);
-    let preserveReloadNotice = false;
-    setConnection('Reconnecting');
-    while (!controller.signal.aborted) {
-      const result = await replayEvents(projectId, cursor, add, {
-        signal: controller.signal,
-        onOpen: () => {
-          if (!preserveReloadNotice) setConnection('Live');
-        },
-      });
-      if (result === 'expired') {
-        const fresh = await getProject(projectId);
-        setView(fresh);
-        setActivity([]);
-        cursor = fresh.lastSequence;
-        sessionStorage.setItem('moonshift:last-sequence', String(cursor));
-        preserveReloadNotice = true;
-        setConnection('Reloaded after expired cursor');
-        continue;
-      }
-      preserveReloadNotice = false;
-      setConnection('Reconnecting');
-      const replayCursor = sessionStorage.getItem('moonshift:last-sequence');
-      cursor = replayCursor === null ? cursor : Number(replayCursor);
-      await new Promise<void>((resolve) => window.setTimeout(resolve, 100));
-    }
-  }, [add, projectId]);
+    await followProjectEvents({
+      projectId,
+      signal: controller.signal,
+      onProject: setView,
+      onEvents: setActivity,
+      onConnection: setConnection,
+    });
+  }, [projectId]);
+
   useEffect(() => {
     void reconnect().catch((error: unknown) => {
       if (!(error instanceof DOMException && error.name === 'AbortError')) setConnection('Offline');
     });
     return () => stream.current?.abort();
   }, [reconnect]);
+
   const personas = useMemo(() => view.personas ?? [], [view]);
   const specialists = view.specialists ?? [];
   const specialistId = specialists[0]?.agentId;
@@ -81,6 +49,7 @@ export function Observe({ initial }: { initial: ProjectView }) {
       : task.state === 'WAITING_FOR_APPROVAL'
         ? 'Waiting for approval'
         : 'Ready to run';
+
   return (
     <main>
       <h1>Observe</h1>
@@ -107,17 +76,19 @@ export function Observe({ initial }: { initial: ProjectView }) {
           <div role="treeitem">
             Engineering
             <ul>
-              {specialists.map((s: any) => (
-                <li key={s.agentId ?? s.id}>Release-note specialist</li>
+              {specialists.map((specialist: Record<string, unknown>) => (
+                <li key={String(specialist.agentId ?? specialist.id)}>Release-note specialist</li>
               ))}
             </ul>
           </div>
           <div role="treeitem">Quality</div>
           {personas
-            .filter((p: any) => !['PRODUCT', 'ENGINEERING', 'QUALITY'].includes(p.role))
-            .map((p: any) => (
-              <div role="treeitem" key={p.id}>
-                {p.name ?? p.role}
+            .filter(
+              (persona) => !['PRODUCT', 'ENGINEERING', 'QUALITY'].includes(String(persona.role)),
+            )
+            .map((persona) => (
+              <div role="treeitem" key={String(persona.id)}>
+                {String(persona.name ?? persona.role)}
               </div>
             ))}
         </div>
@@ -125,9 +96,9 @@ export function Observe({ initial }: { initial: ProjectView }) {
       <section>
         <h2>Channels</h2>
         <div role="tree" aria-label="Channels">
-          {channels.map((c) => (
-            <div role="treeitem" key={String(c.channelId)}>
-              {String(c.name ?? c.kind ?? 'Implementation')}
+          {channels.map((channel) => (
+            <div role="treeitem" key={String(channel.channelId)}>
+              {String(channel.name ?? channel.kind ?? 'Implementation')}
             </div>
           ))}
         </div>
@@ -148,7 +119,7 @@ export function Observe({ initial }: { initial: ProjectView }) {
         <h2>Activity</h2>
         <ol role="log" aria-label="Project activity">
           {activity.map((item) => (
-            <li key={item.eventId} data-sequence={item.sequence}>
+            <li key={item.eventId} data-sequence={item.sequence} data-event-id={item.eventId}>
               {item.payload.summary ?? item.kind}
             </li>
           ))}
