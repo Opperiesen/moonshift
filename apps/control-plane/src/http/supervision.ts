@@ -106,6 +106,12 @@ export function registerSupervisionRoutes(input: {
   readonly server: FastifyInstance;
   readonly supervision: SupervisionService;
   readonly sessions: LoopbackSessionManager;
+  readonly afterApprovedEffect?: (projectId: string, correlationId: string) => Promise<void>;
+  readonly afterControl?: (
+    projectId: string,
+    command: 'PAUSE' | 'RESUME' | 'STOP' | 'CANCEL',
+    correlationId: string,
+  ) => Promise<void>;
 }): void {
   input.server.get<{
     Params: { projectId: string };
@@ -190,6 +196,9 @@ export function registerSupervisionRoutes(input: {
           reason: body.reason,
           ...identity,
         });
+        if (decided.approval.state === 'APPROVED') {
+          await input.afterApprovedEffect?.(request.params.projectId, identity.correlationId);
+        }
         return reply.header('etag', `"${decided.approval.version}"`).send(decided.approval);
       } catch (error) {
         return handleError(error, reply, request);
@@ -228,6 +237,7 @@ export function registerSupervisionRoutes(input: {
             reason: body.reason,
             ...identity,
           });
+          await input.afterControl?.(request.params.projectId, command, identity.correlationId);
           return reply.code(202).send(accepted);
         } catch (error) {
           return handleError(error, reply, request);

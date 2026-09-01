@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { Projects } from '../features/projects/Projects.js';
 import { Observe } from '../features/observe/Observe.js';
 import { Supervise } from '../features/supervise/Supervise.js';
+import { Results } from '../features/results/Results.js';
 import { bootstrap, type ProjectView } from '../services/project-api.js';
 export function App() {
   const [session, setSession] = useState<'loading' | 'ready' | 'error'>('loading');
   const [project, setProject] = useState<ProjectView>();
-  const [view, setView] = useState<'observe' | 'supervise'>('observe');
+  const [view, setView] = useState<'observe' | 'supervise' | 'results'>('observe');
   useEffect(() => {
     const secret = new URLSearchParams(location.hash.slice(1)).get('bootstrap');
     history.replaceState(null, '', location.pathname + location.search);
@@ -43,12 +44,17 @@ export function App() {
         </button>{' '}
         <button onClick={() => setView('supervise')} aria-pressed={view === 'supervise'}>
           Supervise
+        </button>{' '}
+        <button onClick={() => setView('results')} aria-pressed={view === 'results'}>
+          Results
         </button>
       </nav>
       {view === 'observe' ? (
         <Observe initial={project} />
-      ) : (
+      ) : view === 'supervise' ? (
         <Supervise initial={project} onProjectChange={setProject} />
+      ) : (
+        <Results projectId={project.projectId} />
       )}
     </>
   );

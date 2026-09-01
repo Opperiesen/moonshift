@@ -8,12 +8,14 @@
     "./scheduler": "./src/scheduler/index.ts"
   },
   "dependencies": {
+    "@moonshift/artifacts": "workspace:*",
     "@moonshift/backend-fake": "workspace:*",
     "@moonshift/context": "workspace:*",
     "@moonshift/contracts": "workspace:*",
     "@moonshift/domain": "workspace:*",
     "@moonshift/persistence": "workspace:*",
     "@moonshift/policy": "workspace:*",
+    "@moonshift/verification": "workspace:*",
     "fastify": "catalog:",
     "pg": "catalog:"
   }

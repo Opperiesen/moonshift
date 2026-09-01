@@ -1,4 +1,5 @@
 import type { Pool, PoolClient } from 'pg';
+import { persistVerificationRecords } from '@moonshift/persistence';
 
 import {
   ControlPlaneError,
@@ -248,6 +249,7 @@ export class PostgresProjectRepository implements ProjectRepository {
       ) {
         throw new Error('Project mutation did not preserve identity and monotonic versions');
       }
+      await persistVerificationRecords(client, changed.record.verification);
       await client.query(
         `UPDATE project_snapshots
          SET version = $2, record = $3, updated_at = clock_timestamp()

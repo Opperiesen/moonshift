@@ -9,11 +9,13 @@
   },
   "include": ["src/**/*.ts"],
   "references": [
+    { "path": "../../packages/artifacts" },
     { "path": "../../packages/contracts" },
     { "path": "../../packages/domain" },
     { "path": "../../packages/policy" },
     { "path": "../../packages/context" },
     { "path": "../../packages/backend-fake" },
-    { "path": "../../packages/persistence" }
+    { "path": "../../packages/persistence" },
+    { "path": "../../packages/verification" }
   ]
 }

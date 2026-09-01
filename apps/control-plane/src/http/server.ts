@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
+import { rm } from 'node:fs/promises';
 import type { AddressInfo } from 'node:net';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
+import { FsArtifactStore } from '@moonshift/artifacts';
 import { isUuid } from '@moonshift/contracts';
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from 'fastify';
 import type { Pool } from 'pg';
@@ -8,6 +12,7 @@ import type { Pool } from 'pg';
 import { ControlPlaneError, EventCursorExpiredError } from '../errors.js';
 import type { FixtureScenario } from '../model.js';
 import { formatProjectEventsAsSse } from '../projections/project-events.js';
+import { projectResults } from '../projections/results.js';
 import { FixtureScheduler } from '../scheduler/index.js';
 import {
   InMemoryProjectRepository,
@@ -20,6 +25,7 @@ import {
   SupervisionService,
   type ApprovedEffectExecutor,
 } from '../application/supervision/index.js';
+import { VerificationService } from '../application/verification/index.js';
 import { LoopbackSessionManager } from './session.js';
 import { registerSupervisionRoutes } from './supervision.js';
 
@@ -118,6 +124,7 @@ export function createControlPlaneServer(input: {
   readonly service: ProjectService;
   readonly repository: ProjectRepository;
   readonly supervision: SupervisionService;
+  readonly verification: VerificationService;
   readonly sessions: LoopbackSessionManager;
   readonly version?: string;
 }): FastifyInstance {
@@ -129,6 +136,13 @@ export function createControlPlaneServer(input: {
     server,
     supervision: input.supervision,
     sessions: input.sessions,
+    afterApprovedEffect: (projectId, correlationId) =>
+      input.verification.runConfiguredFixture(projectId, correlationId),
+    afterControl: async (projectId, command, correlationId) => {
+      if (command === 'RESUME') {
+        await input.verification.resumeStaleEvaluation({ projectId, correlationId });
+      }
+    },
   });
 
   server.post('/v1/session/bootstrap', async (request, reply) => {
@@ -214,6 +228,21 @@ export function createControlPlaneServer(input: {
       if (view === null)
         return problem(reply, 404, 'PROJECT_NOT_FOUND', 'Project not found', requestCorrelation);
       return reply.header('etag', `"${view.version}"`).send(view);
+    },
+  );
+
+  server.get<{ Params: { projectId: string } }>(
+    '/v1/projects/:projectId/results',
+    async (request, reply) => {
+      const actorId = authenticate(request, reply, input.sessions);
+      if (actorId === null) return reply;
+      const requestCorrelation = correlation(request);
+      if (!isUuid(request.params.projectId))
+        return problem(reply, 404, 'PROJECT_NOT_FOUND', 'Project not found', requestCorrelation);
+      const record = await input.repository.get(request.params.projectId);
+      if (record === null)
+        return problem(reply, 404, 'PROJECT_NOT_FOUND', 'Project not found', requestCorrelation);
+      return reply.send(projectResults(record));
     },
   );
 
@@ -314,6 +343,8 @@ export function createFixtureControlPlane(input: {
   readonly scheduler: FixtureScheduler;
   readonly supervision: SupervisionService;
   readonly effectExecutor: InMemoryApprovedEffectExecutor;
+  readonly verification: VerificationService;
+  readonly artifactStore: FsArtifactStore;
   readonly advanceTime: (milliseconds: number) => void;
   readonly resetTime: () => void;
 } {
@@ -337,15 +368,36 @@ export function createFixtureControlPlane(input: {
     nextId: randomUUID,
   });
   const effectExecutor = new InMemoryApprovedEffectExecutor();
+  const artifactRoot = join(tmpdir(), `moonshift-fixture-artifacts-${randomUUID()}`);
+  const artifactStore = new FsArtifactStore({
+    root: artifactRoot,
+    ownerId: input.supervisorId,
+  });
+  const systemId = randomUUID();
   const supervision = new SupervisionService({
     repository,
     effectExecutor,
     nextId: randomUUID,
     expectedRevision: scheduler.expectedRevision,
-    systemId: randomUUID(),
+    systemId,
     runnerId: randomUUID(),
   });
-  const server = createControlPlaneServer({ service, repository, supervision, sessions });
+  const verification = new VerificationService({
+    repository,
+    artifactStore,
+    nextId: randomUUID,
+    expectedRevision: scheduler.expectedRevision,
+    systemId,
+    engineId: randomUUID(),
+  });
+  const server = createControlPlaneServer({
+    service,
+    repository,
+    supervision,
+    verification,
+    sessions,
+  });
+  server.addHook('onClose', async () => rm(artifactRoot, { recursive: true, force: true }));
   return {
     server,
     sessions,
@@ -354,6 +406,8 @@ export function createFixtureControlPlane(input: {
     scheduler,
     supervision,
     effectExecutor,
+    verification,
+    artifactStore,
     advanceTime: (milliseconds) => {
       fixtureTime += milliseconds;
     },
@@ -375,6 +429,7 @@ export function createPostgresControlPlane(input: {
   readonly nextId?: () => string;
   readonly version?: string;
   readonly effectExecutor: ApprovedEffectExecutor;
+  readonly artifactRoot?: string;
 }): {
   readonly server: FastifyInstance;
   readonly sessions: LoopbackSessionManager;
@@ -382,6 +437,8 @@ export function createPostgresControlPlane(input: {
   readonly service: ProjectService;
   readonly scheduler: FixtureScheduler;
   readonly supervision: SupervisionService;
+  readonly verification: VerificationService;
+  readonly artifactStore: FsArtifactStore;
 } {
   const now = input.now ?? (() => new Date());
   const nextId = input.nextId ?? randomUUID;
@@ -399,20 +456,45 @@ export function createPostgresControlPlane(input: {
     expectedRevision: input.expectedRevision,
   });
   const service = new ProjectService({ repository, scheduler, nextId });
+  const artifactRoot =
+    input.artifactRoot ?? join(tmpdir(), `moonshift-postgres-artifacts-${randomUUID()}`);
+  const artifactStore = new FsArtifactStore({ root: artifactRoot, ownerId: input.supervisorId });
+  const systemId = nextId();
   const supervision = new SupervisionService({
     repository,
     effectExecutor: input.effectExecutor,
     nextId,
     expectedRevision: input.expectedRevision,
-    systemId: nextId(),
+    systemId,
     runnerId: input.runnerId,
+  });
+  const verification = new VerificationService({
+    repository,
+    artifactStore,
+    nextId,
+    expectedRevision: input.expectedRevision,
+    systemId,
+    engineId: nextId(),
   });
   const server = createControlPlaneServer({
     service,
     repository,
     supervision,
+    verification,
     sessions,
     ...(input.version === undefined ? {} : { version: input.version }),
   });
-  return { server, sessions, repository, service, scheduler, supervision };
+  if (input.artifactRoot === undefined) {
+    server.addHook('onClose', async () => rm(artifactRoot, { recursive: true, force: true }));
+  }
+  return {
+    server,
+    sessions,
+    repository,
+    service,
+    scheduler,
+    supervision,
+    verification,
+    artifactStore,
+  };
 }

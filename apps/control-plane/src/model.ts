@@ -8,6 +8,13 @@ import type {
 } from '@moonshift/contracts';
 import type { CompleteDelegation, SpecialistIdentity } from '@moonshift/domain';
 import type { ContextManifest } from '@moonshift/context';
+import type {
+  QualityReviewAssignment,
+  VerificationArtifact,
+  VerificationEvaluation,
+  VerificationEvidence,
+  VerificationPolicy,
+} from '@moonshift/verification';
 
 export type FixtureScenario =
   | 'PASS'
@@ -93,6 +100,9 @@ export type EventKind =
   | 'approval.requested'
   | 'approval.decided'
   | 'effect.state_changed'
+  | 'artifact.published'
+  | 'evidence.recorded'
+  | 'verification.decided'
   | 'checkpoint.created'
   | 'audit.notice';
 
@@ -119,6 +129,8 @@ export interface ProjectEvent {
       | 'TOOL_INVOCATION'
       | 'APPROVAL'
       | 'EXTERNAL_EFFECT'
+      | 'ARTIFACT'
+      | 'EVIDENCE'
       | 'CHECKPOINT';
     readonly id: string;
     readonly version: number;
@@ -277,10 +289,25 @@ export interface SupervisionProjection extends SupervisionRecord {
   readonly projectVersion: number;
 }
 
+export interface QualityReviewRecord extends QualityReviewAssignment {
+  readonly contextManifest: ContextManifest;
+}
+
+export interface VerificationRecord {
+  readonly taskVersion: number;
+  readonly policy: VerificationPolicy;
+  readonly artifacts: readonly VerificationArtifact[];
+  readonly evidence: readonly VerificationEvidence[];
+  readonly review: QualityReviewRecord | null;
+  readonly evaluations: readonly VerificationEvaluation[];
+}
+
 export interface ProjectRecord {
+  readonly fixtureScenario: FixtureScenario;
   readonly view: ProjectView;
   readonly organization: ProjectOrganization;
   readonly scheduling: SchedulingResult;
   readonly supervision: SupervisionRecord;
+  readonly verification: VerificationRecord;
   readonly events: readonly ProjectEvent[];
 }

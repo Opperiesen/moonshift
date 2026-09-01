@@ -8,6 +8,7 @@ import {
   createTask,
 } from '@moonshift/domain';
 import { DEFAULT_POLICY_PROFILE } from '@moonshift/policy';
+import { DEFAULT_VERIFICATION_POLICY } from '@moonshift/verification';
 
 import { ControlPlaneError } from '../../errors.js';
 import type {
@@ -448,10 +449,19 @@ export class ProjectService {
           lastSequence: eventSnapshot.at(-1)?.sequence ?? 0,
         });
         const record: ProjectRecord = Object.freeze({
+          fixtureScenario: command.fixtureScenario,
           view,
           organization: Object.freeze({ specialist, delegation }),
           scheduling,
           supervision: Object.freeze({ ...supervision, audit: supervisionAudit }),
+          verification: Object.freeze({
+            taskVersion: 1,
+            policy: DEFAULT_VERIFICATION_POLICY,
+            artifacts: Object.freeze([]),
+            evidence: Object.freeze([]),
+            review: null,
+            evaluations: Object.freeze([]),
+          }),
           events: eventSnapshot,
         });
         return record;

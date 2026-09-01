@@ -93,6 +93,9 @@ importers:
 
   apps/control-plane:
     dependencies:
+      '@moonshift/artifacts':
+        specifier: workspace:*
+        version: link:../../packages/artifacts
       '@moonshift/backend-fake':
         specifier: workspace:*
         version: link:../../packages/backend-fake
@@ -111,6 +114,9 @@ importers:
       '@moonshift/policy':
         specifier: workspace:*
         version: link:../../packages/policy
+      '@moonshift/verification':
+        specifier: workspace:*
+        version: link:../../packages/verification
       fastify:
         specifier: 'catalog:'
         version: 5.12.1
@@ -165,10 +171,19 @@ importers:
       '@moonshift/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@moonshift/verification':
+        specifier: workspace:*
+        version: link:../verification
 
   packages/policy: {}
 
   packages/test-fixtures: {}
+
+  packages/verification:
+    dependencies:
+      '@moonshift/domain':
+        specifier: workspace:*
+        version: link:../domain
 
 packages:
 

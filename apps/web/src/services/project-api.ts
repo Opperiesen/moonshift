@@ -70,6 +70,86 @@ export interface SupervisionView {
   readonly projectVersion: number;
 }
 
+export interface ResultArtifactView {
+  readonly artifactId: string;
+  readonly projectId: string;
+  readonly taskId: string;
+  readonly executionId: string;
+  readonly kind: string;
+  readonly mediaType: string;
+  readonly size: number;
+  readonly contentHash: `sha256:${string}`;
+  readonly gitRevision: string;
+}
+
+export interface ResultEvidenceView {
+  readonly evidenceId: string;
+  readonly producerAgentId: string;
+  readonly type:
+    'BUILD' | 'TEST' | 'INTEGRITY' | 'COVERAGE' | 'REVIEW' | 'APPROVAL' | 'RECONCILIATION';
+  readonly status: 'PASS' | 'FAIL' | 'MISSING' | 'STALE' | 'BLOCKING';
+  readonly observedAt: string;
+  readonly gitRevision: string;
+  readonly sourceHash: `sha256:${string}`;
+}
+
+export interface ResultView {
+  readonly projectId: string;
+  readonly projectState: string;
+  readonly task: {
+    readonly taskId: string;
+    readonly title: string;
+    readonly state: string;
+    readonly assigneeAgentId: string | null;
+    readonly expectedRevision: string;
+  };
+  readonly artifacts: readonly ResultArtifactView[];
+  readonly evidence: readonly ResultEvidenceView[];
+  readonly approvals: readonly ApprovalView[];
+  readonly executions: readonly {
+    readonly executionId: string;
+    readonly agentId: string;
+    readonly runtimeId: string;
+    readonly backendConnectionId: string;
+    readonly modelDescriptorId: string;
+    readonly modelDescriptorVersion: number;
+    readonly state: string;
+    readonly attemptNumber: number;
+    readonly startedAt: string;
+    readonly endedAt: string | null;
+  }[];
+  readonly checkpoints: readonly {
+    readonly checkpointId: string;
+    readonly executionId: string;
+    readonly schemaVersion: string;
+    readonly contentHash: `sha256:${string}`;
+    readonly gitRevision: string;
+    readonly createdAt: string;
+  }[];
+  readonly effects: SupervisionView['effects'];
+  readonly organizationLineage: {
+    readonly authorAgentId: string;
+    readonly authorLineageId: string;
+    readonly reviewerAgentId: string | null;
+    readonly reviewerLineageId: string | null;
+    readonly independentReview: boolean;
+  };
+  readonly audit: readonly {
+    readonly auditEventId: string;
+    readonly sequence: number;
+    readonly actorType: string;
+    readonly actorId: string;
+    readonly action: string;
+    readonly targetType: string;
+    readonly targetId: string;
+    readonly occurredAt: string;
+    readonly reason: string;
+    readonly outcome: string;
+    readonly correlationId: string;
+  }[];
+  readonly verified: boolean;
+}
+
 export async function bootstrap(secret: string): Promise<void> {
   const response = await fetch('/v1/session/bootstrap', {
     method: 'POST',
@@ -131,6 +211,13 @@ export async function listApprovals(projectId: string): Promise<SupervisionView>
     credentials: 'include',
   });
   return (await responseBody(response, 'Unable to load supervision.')) as SupervisionView;
+}
+
+export async function getResults(projectId: string): Promise<ResultView> {
+  const response = await fetch(`/v1/projects/${encodeURIComponent(projectId)}/results`, {
+    credentials: 'include',
+  });
+  return (await responseBody(response, 'Unable to load project results.')) as ResultView;
 }
 
 export async function getApproval(

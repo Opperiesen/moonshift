@@ -143,19 +143,19 @@ the passing artifact reviewed outside the author lineage reaches `VERIFIED`.
 
 ### Tests for User Story 3
 
-- [ ] T047 [P] [US3] Add verification rule-matrix tests for claim, reviewer lineage, immutable evidence snapshots, revision binding, tampering, blocking reasons, stale-on-policy/revision/membership/hash change, and pause serialization proving no VERIFIED commit after PAUSED with mandatory reevaluation after resume in `packages/verification/src/verification-engine.test.ts`
-- [ ] T048 [P] [US3] Add artifact/evidence persistence tests for attribution, integrity address, expected revision, evaluation snapshot compare-and-commit, stale disposition, and fresh reevaluation in `tests/integration/verification.test.ts`
-- [ ] T049 [P] [US3] Add API and projection contract tests for results, verification event payloads, exact ExecutionState parity, descriptor ID/version provenance, and SUSPENDED/STOPPING/STOPPED rendering in `tests/contract/results-api.test.ts`
-- [ ] T050 [P] [US3] Add browser acceptance for passing, failing, unverified, wrong-lineage, and tampered evidence states in `tests/acceptance/verification.spec.ts`
+- [x] T047 [P] [US3] Add verification rule-matrix tests for claim, reviewer lineage, immutable evidence snapshots, revision binding, tampering, blocking reasons, stale-on-policy/revision/membership/hash change, and pause serialization proving no VERIFIED commit after PAUSED with mandatory reevaluation after resume in `packages/verification/src/verification-engine.test.ts`
+- [x] T048 [P] [US3] Add artifact/evidence persistence tests for attribution, integrity address, expected revision, evaluation snapshot compare-and-commit, stale disposition, and fresh reevaluation in `tests/integration/verification.test.ts`
+- [x] T049 [P] [US3] Add API and projection contract tests for results, verification event payloads, exact ExecutionState parity, descriptor ID/version provenance, and SUSPENDED/STOPPING/STOPPED rendering in `tests/contract/results-api.test.ts`
+- [x] T050 [P] [US3] Add browser acceptance for passing, failing, unverified, wrong-lineage, and tampered evidence states in `tests/acceptance/verification.spec.ts`
 
 ### Implementation for User Story 3
 
-- [ ] T051 [US3] Implement artifact publication and completion-claim commands that stop at `CLAIMED_COMPLETE` in `apps/control-plane/src/application/verification/claims.ts`
-- [ ] T052 [US3] Implement independent Quality assignment with author-lineage exclusion and a separate context manifest in `apps/control-plane/src/application/verification/review-routing.ts`
-- [ ] T053 [US3] Implement versioned deterministic verification rules, immutable evaluation snapshots, stale-on-change compare-and-commit, Project-state serialization that forbids commit after PAUSED, fresh reevaluation after resume, and sole authority for `VERIFIED` in `packages/verification/src/`
-- [ ] T054 [US3] Persist artifacts, evidence, verification policy/rules/evaluations, and revision bindings transactionally in `packages/persistence/src/repositories/verification.ts`
-- [ ] T055 [US3] Implement result queries and verification event projections without completion inflation in `apps/control-plane/src/projections/results.ts`
-- [ ] T056 [P] [US3] Implement Results artifact and evidence matrix states with explicit reviewer lineage and blocking reasons in `apps/web/src/features/results/`
+- [x] T051 [US3] Implement artifact publication and completion-claim commands that stop at `CLAIMED_COMPLETE` in `apps/control-plane/src/application/verification/claims.ts`
+- [x] T052 [US3] Implement independent Quality assignment with author-lineage exclusion and a separate context manifest in `apps/control-plane/src/application/verification/review-routing.ts`
+- [x] T053 [US3] Implement versioned deterministic verification rules, immutable evaluation snapshots, stale-on-change compare-and-commit, Project-state serialization that forbids commit after PAUSED, fresh reevaluation after resume, and sole authority for `VERIFIED` in `packages/verification/src/`
+- [x] T054 [US3] Persist artifacts, evidence, verification policy/rules/evaluations, and revision bindings transactionally in `packages/persistence/src/repositories/verification.ts`
+- [x] T055 [US3] Implement result queries and verification event projections without completion inflation in `apps/control-plane/src/projections/results.ts`
+- [x] T056 [P] [US3] Implement Results artifact and evidence matrix states with explicit reviewer lineage and blocking reasons in `apps/web/src/features/results/`
 - [ ] T057 [US3] Run the independent US3 tests and record passing/failing rule matrices, artifact hashes, revision, and Quality lineage in `evidence/001-supervised-autonomous-loop/us3/manifest.json`
 
 **Checkpoint**: US3 is independently accepted; a specialist claim alone is never displayed or stored

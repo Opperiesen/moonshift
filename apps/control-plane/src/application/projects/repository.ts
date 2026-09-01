@@ -2,9 +2,11 @@ import { createHash, randomUUID } from 'node:crypto';
 
 import {
   planningValidators,
+  type ExecutionState,
   type PresenceSourceType,
   type PresenceState,
 } from '@moonshift/contracts';
+import { transitionExecution } from '@moonshift/domain';
 
 import {
   ControlPlaneError,
@@ -278,6 +280,118 @@ export class InMemoryProjectRepository implements ProjectRepository {
       Object.freeze({
         ...record,
         view: Object.freeze({ ...record.view, presences: Object.freeze(presences) }),
+      }),
+    );
+  }
+
+  setFixtureExecutionState(projectId: string, state: ExecutionState): void {
+    const record = this.projects.get(projectId);
+    if (record === undefined) throw new Error('Project not found');
+    const paths: Record<ExecutionState, readonly ExecutionState[]> = {
+      QUEUED: [],
+      STARTING: ['STARTING'],
+      RUNNING: ['STARTING', 'RUNNING'],
+      WAITING_FOR_APPROVAL: ['STARTING', 'RUNNING', 'WAITING_FOR_APPROVAL'],
+      CHECKPOINTING: ['STARTING', 'RUNNING', 'CHECKPOINTING'],
+      SUSPENDED: ['SUSPENDED'],
+      STOPPING: ['STOPPING'],
+      STOPPED: ['STOPPING', 'STOPPED'],
+      SUCCEEDED: ['STARTING', 'RUNNING', 'SUCCEEDED'],
+      FAILED: ['STARTING', 'FAILED'],
+      CANCELLED: ['CANCELLED'],
+      LOST: ['STARTING', 'LOST'],
+      RECONCILING: ['STARTING', 'LOST', 'RECONCILING'],
+    };
+    const executionId = randomUUID();
+    const actorId = randomUUID();
+    const correlationId = record.events[0]?.correlationId ?? randomUUID();
+    const occurredAt = this.authorityClock().toISOString();
+    const events: ProjectEvent[] = [];
+    let execution: { readonly state: ExecutionState; readonly version: number } = {
+      state: 'QUEUED',
+      version: 1,
+    };
+    events.push(
+      Object.freeze({
+        schemaVersion: '1.0',
+        eventId: randomUUID(),
+        projectId,
+        sequence: record.view.lastSequence + 1,
+        kind: 'execution.state_changed',
+        occurredAt,
+        actor: Object.freeze({ type: 'SYSTEM', id: actorId }),
+        aggregate: Object.freeze({ type: 'EXECUTION', id: executionId, version: 1 }),
+        correlationId,
+        classification: 'PUBLIC_FIXTURE',
+        payload: Object.freeze({
+          fromState: null,
+          toState: 'QUEUED',
+          reasonCode: 'FIXTURE_EXECUTION_CREATED',
+          summary: 'Synthetic contract execution entered its initial queued state',
+        }),
+      }),
+    );
+    for (const nextState of paths[state]) {
+      const previousState = execution.state;
+      execution = transitionExecution(
+        execution,
+        nextState,
+        nextState === 'RECONCILING'
+          ? { type: 'RECOVERY_COORDINATOR', id: actorId }
+          : { type: 'SYSTEM', id: actorId },
+        execution.version,
+      );
+      events.push(
+        Object.freeze({
+          schemaVersion: '1.0',
+          eventId: randomUUID(),
+          projectId,
+          sequence: record.view.lastSequence + events.length + 1,
+          kind: 'execution.state_changed',
+          occurredAt,
+          actor: Object.freeze({ type: 'SYSTEM', id: actorId }),
+          aggregate: Object.freeze({
+            type: 'EXECUTION',
+            id: executionId,
+            version: execution.version,
+          }),
+          correlationId,
+          classification: 'PUBLIC_FIXTURE',
+          payload: Object.freeze({
+            fromState: previousState,
+            toState: execution.state,
+            reasonCode: 'FIXTURE_EXECUTION_TRANSITION',
+            summary: `Synthetic contract execution transitioned to ${execution.state}`,
+          }),
+        }),
+      );
+    }
+    for (const event of events) planningValidators().eventEnvelope.assert(event);
+    const lastSequence = events.at(-1)?.sequence ?? record.view.lastSequence;
+    this.projects.set(
+      projectId,
+      Object.freeze({
+        ...record,
+        view: Object.freeze({ ...record.view, lastSequence }),
+        scheduling: Object.freeze({
+          ...record.scheduling,
+          execution: Object.freeze({
+            ...record.scheduling.execution,
+            executionId,
+            state: execution.state,
+          }),
+          runtime: Object.freeze({ ...record.scheduling.runtime, executionId }),
+        }),
+        supervision: Object.freeze({
+          ...record.supervision,
+          authority: Object.freeze({
+            ...record.supervision.authority,
+            executionId,
+            executionAttempt: record.supervision.authority.executionAttempt + 1,
+            executionState: execution.state,
+          }),
+        }),
+        events: Object.freeze([...record.events, ...events]),
       }),
     );
   }

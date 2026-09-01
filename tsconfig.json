@@ -6,6 +6,7 @@
     { "path": "./packages/policy" },
     { "path": "./packages/persistence" },
     { "path": "./packages/artifacts" },
+    { "path": "./packages/verification" },
     { "path": "./packages/context" },
     { "path": "./packages/backend-fake" },
     { "path": "./packages/test-fixtures" },

@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 
+import { EXECUTION_TRANSITIONS, transitionExecution, type ExecutionState } from '@moonshift/domain';
 import {
   canonicalActionDigest,
   DEFAULT_POLICY_PROFILE,
@@ -68,6 +69,8 @@ function replaceRecord(input: {
   readonly status?: ProjectView['status'];
   readonly tasks?: ProjectView['tasks'];
   readonly capacity?: ProjectView['capacity'];
+  readonly scheduling?: ProjectRecord['scheduling'];
+  readonly verification?: ProjectRecord['verification'];
   readonly supervision: Omit<SupervisionRecord, 'audit'>;
   readonly events: Parameters<typeof appendSupervisionMutation>[0]['events'];
   readonly audits: Parameters<typeof appendSupervisionMutation>[0]['audits'];
@@ -94,6 +97,8 @@ function replaceRecord(input: {
       capacity: input.capacity ?? input.record.view.capacity,
       lastSequence,
     }),
+    scheduling: input.scheduling ?? input.record.scheduling,
+    verification: input.verification ?? input.record.verification,
     supervision: Object.freeze({ ...input.supervision, audit: appended.audit }),
     events: Object.freeze([...input.record.events, ...appended.events]),
   });
@@ -115,6 +120,124 @@ function controlStates(command: ControlCommand) {
   if (command === 'RESUME') return ['RESUMING', 'ACTIVE'] as const;
   if (command === 'STOP') return ['STOPPING', 'STOPPED'] as const;
   return ['CANCELLING', 'CANCELLED'] as const;
+}
+
+function latestExecutionVersion(record: ProjectRecord, executionId: string): number {
+  return record.events.reduce(
+    (version, event) =>
+      event.aggregate.type === 'EXECUTION' && event.aggregate.id === executionId
+        ? Math.max(version, event.aggregate.version)
+        : version,
+    0,
+  );
+}
+
+function executionPath(from: ExecutionState, to: ExecutionState): readonly ExecutionState[] {
+  if (from === to) return Object.freeze([]);
+  const pending: Array<{
+    readonly state: ExecutionState;
+    readonly path: readonly ExecutionState[];
+  }> = [{ state: from, path: Object.freeze([]) }];
+  const visited = new Set<ExecutionState>([from]);
+  while (pending.length > 0) {
+    const candidate = pending.shift();
+    if (candidate === undefined) break;
+    for (const next of EXECUTION_TRANSITIONS[candidate.state]) {
+      if (visited.has(next)) continue;
+      const path = Object.freeze([...candidate.path, next]);
+      if (next === to) return path;
+      visited.add(next);
+      pending.push({ state: next, path });
+    }
+  }
+  throw new Error(`No legal execution transition path from ${from} to ${to}`);
+}
+
+function executionTransitionEvents(input: {
+  readonly record: ProjectRecord;
+  readonly executionId: string;
+  readonly fromState: ExecutionState;
+  readonly toState: ExecutionState;
+  readonly systemId: string;
+  readonly reasonCode: string;
+  readonly summary: string;
+}): readonly Parameters<typeof appendSupervisionMutation>[0]['events'][number][] {
+  let aggregate = {
+    state: input.fromState,
+    version: latestExecutionVersion(input.record, input.executionId),
+  };
+  const events: Array<Parameters<typeof appendSupervisionMutation>[0]['events'][number]> = [];
+  for (const nextState of executionPath(input.fromState, input.toState)) {
+    const transitioned = transitionExecution(
+      aggregate,
+      nextState,
+      nextState === 'RECONCILING'
+        ? { type: 'RECOVERY_COORDINATOR', id: input.systemId }
+        : { type: 'SYSTEM', id: input.systemId },
+      aggregate.version,
+    );
+    events.push({
+      kind: 'execution.state_changed',
+      actor: { type: 'SYSTEM', id: input.systemId },
+      aggregate: {
+        type: 'EXECUTION',
+        id: input.executionId,
+        version: transitioned.version,
+      },
+      payload: {
+        fromState: aggregate.state,
+        toState: transitioned.state,
+        reasonCode: input.reasonCode,
+        summary: input.summary,
+      },
+    });
+    aggregate = transitioned;
+  }
+  return Object.freeze(events);
+}
+
+function successorExecutionEvents(
+  executionId: string,
+  systemId: string,
+): readonly Parameters<typeof appendSupervisionMutation>[0]['events'][number][] {
+  const events: Array<Parameters<typeof appendSupervisionMutation>[0]['events'][number]> = [
+    {
+      kind: 'execution.state_changed',
+      actor: { type: 'SYSTEM', id: systemId },
+      aggregate: { type: 'EXECUTION', id: executionId, version: 1 },
+      payload: {
+        fromState: null,
+        toState: 'QUEUED',
+        reasonCode: 'SUCCESSOR_EXECUTION_CREATED',
+        summary: 'Resume created a fresh successor execution under new authority',
+      },
+    },
+  ];
+  let aggregate: { readonly state: ExecutionState; readonly version: number } = {
+    state: 'QUEUED',
+    version: 1,
+  };
+  for (const nextState of ['STARTING', 'RUNNING', 'WAITING_FOR_APPROVAL'] as const) {
+    const transitioned = transitionExecution(
+      aggregate,
+      nextState,
+      { type: 'SYSTEM', id: systemId },
+      aggregate.version,
+    );
+    events.push({
+      kind: 'execution.state_changed',
+      actor: { type: 'SYSTEM', id: systemId },
+      aggregate: { type: 'EXECUTION', id: executionId, version: transitioned.version },
+      payload: {
+        fromState: aggregate.state,
+        toState: transitioned.state,
+        reasonCode: 'SUCCESSOR_EXECUTION_STARTED',
+        summary: 'Successor execution reached the bounded approval boundary',
+      },
+    });
+    aggregate = transitioned;
+  }
+  return Object.freeze(events);
 }
 
 export class SupervisionService {
@@ -1291,29 +1414,30 @@ export class SupervisionService {
               },
               classification: 'PUBLIC_FIXTURE',
             },
-            {
-              kind: 'execution.state_changed',
-              actor: { type: 'SYSTEM', id: this.dependencies.systemId },
-              aggregate: {
-                type: 'EXECUTION',
-                id: record.supervision.authority.executionId,
-                version: record.supervision.authority.executionAttempt,
-              },
-              payload: {
-                fromState: record.supervision.authority.executionState,
-                toState: executionState,
-                reasonCode: known
-                  ? 'CONTROL_RECONCILIATION_COMPLETE'
-                  : 'CONTROL_RECONCILIATION_BLOCKED',
-                summary: known
-                  ? 'Execution reached a known effect ground-truth boundary'
-                  : 'Execution awaits explicit effect-ground-truth remediation',
-              },
-            },
+            ...executionTransitionEvents({
+              record,
+              executionId: record.supervision.authority.executionId,
+              fromState: record.supervision.authority.executionState,
+              toState: executionState,
+              systemId: this.dependencies.systemId,
+              reasonCode: known
+                ? 'CONTROL_RECONCILIATION_COMPLETE'
+                : 'CONTROL_RECONCILIATION_BLOCKED',
+              summary: known
+                ? 'Execution reached a known effect ground-truth boundary'
+                : 'Execution awaits explicit effect-ground-truth remediation',
+            }),
           ];
           const changed = replaceRecord({
             record,
             status: projectState,
+            scheduling: Object.freeze({
+              ...record.scheduling,
+              execution: Object.freeze({
+                ...record.scheduling.execution,
+                state: executionState,
+              }),
+            }),
             capacity: known
               ? Object.freeze({
                   ...record.view.capacity,
@@ -1451,9 +1575,18 @@ export class SupervisionService {
               ['EXECUTING', 'UNKNOWN', 'RECONCILING'].includes(state),
             );
           let supervision: Omit<SupervisionRecord, 'audit'> = { ...record.supervision };
+          let verificationRecord = record.verification;
           let tasks = record.view.tasks;
           let capacity = record.view.capacity;
+          let scheduling = record.scheduling;
           const fromExecution = record.supervision.authority.executionState;
+          const executionAlreadyTerminal = [
+            'SUSPENDED',
+            'STOPPED',
+            'SUCCEEDED',
+            'FAILED',
+            'CANCELLED',
+          ].includes(fromExecution);
           const events: Array<Parameters<typeof appendSupervisionMutation>[0]['events'][number]> = [
             {
               kind: 'project.status_changed',
@@ -1516,7 +1649,55 @@ export class SupervisionService {
               gitRevision: this.dependencies.expectedRevision,
               createdAt: authorityNow,
             });
-            const verification =
+            const staleReason = 'Project reached PAUSED before verification commit';
+            const evaluating = record.verification.evaluations.filter(
+              ({ state }) => state === 'EVALUATING',
+            );
+            if (evaluating.length > 0) {
+              verificationRecord = Object.freeze({
+                ...record.verification,
+                evaluations: Object.freeze(
+                  record.verification.evaluations.map((evaluation) =>
+                    evaluation.state === 'EVALUATING'
+                      ? Object.freeze({
+                          ...evaluation,
+                          state: 'STALE' as const,
+                          decidedAt: authorityNow,
+                          ruleResults: Object.freeze([]),
+                          blockingReasons: Object.freeze([staleReason]),
+                        })
+                      : evaluation,
+                  ),
+                ),
+              });
+              for (const evaluation of evaluating) {
+                events.push({
+                  kind: 'verification.decided',
+                  actor: { type: 'SYSTEM', id: this.dependencies.systemId },
+                  aggregate: {
+                    type: 'TASK',
+                    id: evaluation.taskId,
+                    version: record.verification.taskVersion,
+                  },
+                  payload: {
+                    decision: 'STALE',
+                    reasonCode: 'VERIFICATION_SNAPSHOT_STALE',
+                    summary: staleReason,
+                    evidenceRefs: evaluation.snapshot.evidence.map(({ evidenceId }) => evidenceId),
+                  },
+                });
+                audits.push({
+                  actorType: 'SYSTEM',
+                  actorId: this.dependencies.systemId,
+                  action: 'verification.decided',
+                  targetType: 'TASK',
+                  targetId: evaluation.taskId,
+                  reason: staleReason,
+                  outcome: 'STALE',
+                });
+              }
+            }
+            const supervisionVerification =
               record.supervision.verification.state === 'EVALUATING'
                 ? Object.freeze({
                     ...record.supervision.verification,
@@ -1532,13 +1713,28 @@ export class SupervisionService {
               ),
               authority: Object.freeze({
                 ...record.supervision.authority,
-                executionState: requiresEffectReconciliation ? 'CHECKPOINTING' : 'SUSPENDED',
+                executionState: requiresEffectReconciliation
+                  ? 'CHECKPOINTING'
+                  : executionAlreadyTerminal
+                    ? fromExecution
+                    : 'SUSPENDED',
                 capabilityLeaseState: 'SUSPENDED',
                 runnerLeaseState: 'REVOKED',
               }),
-              verification,
+              verification: supervisionVerification,
               checkpoint,
+              blockedReasons:
+                evaluating.length > 0
+                  ? Object.freeze([staleReason])
+                  : record.supervision.blockedReasons,
             };
+            scheduling = Object.freeze({
+              ...record.scheduling,
+              execution: Object.freeze({
+                ...record.scheduling.execution,
+                state: supervision.authority.executionState,
+              }),
+            });
             capacity = Object.freeze({
               ...record.view.capacity,
               activeCognitiveRuns: Math.max(0, record.view.capacity.activeCognitiveRuns - 1),
@@ -1699,6 +1895,20 @@ export class SupervisionService {
               verification: record.supervision.verification,
               blockedReasons: Object.freeze([]),
             };
+            scheduling = Object.freeze({
+              ...record.scheduling,
+              execution: Object.freeze({
+                ...record.scheduling.execution,
+                executionId,
+                state: 'WAITING_FOR_APPROVAL',
+              }),
+              runtime: Object.freeze({
+                ...record.scheduling.runtime,
+                executionId,
+                status: 'WAITING_FOR_APPROVAL',
+              }),
+              queueReason: 'WAITING_FOR_APPROVAL',
+            });
             capacity = Object.freeze({
               ...record.view.capacity,
               activeCognitiveRuns: Math.min(
@@ -1755,9 +1965,11 @@ export class SupervisionService {
                 ...record.supervision.authority,
                 executionState: requiresEffectReconciliation
                   ? 'STOPPING'
-                  : cancelled
-                    ? 'CANCELLED'
-                    : 'STOPPED',
+                  : executionAlreadyTerminal
+                    ? fromExecution
+                    : cancelled
+                      ? 'CANCELLED'
+                      : 'STOPPED',
                 capabilityLeaseState: 'REVOKED',
                 runnerLeaseState: 'REVOKED',
               }),
@@ -1767,6 +1979,13 @@ export class SupervisionService {
                   ? Object.freeze(['Project cancelled'])
                   : Object.freeze([]),
             };
+            scheduling = Object.freeze({
+              ...record.scheduling,
+              execution: Object.freeze({
+                ...record.scheduling.execution,
+                state: supervision.authority.executionState,
+              }),
+            });
             tasks =
               cancelled && !requiresEffectReconciliation
                 ? updateTaskState(record, 'CANCELLED')
@@ -1787,21 +2006,22 @@ export class SupervisionService {
               },
             });
           }
-          events.push({
-            kind: 'execution.state_changed',
-            actor: { type: 'SYSTEM', id: this.dependencies.systemId },
-            aggregate: {
-              type: 'EXECUTION',
-              id: supervision.authority.executionId,
-              version: supervision.authority.executionAttempt,
-            },
-            payload: {
-              fromState: fromExecution,
-              toState: supervision.authority.executionState,
-              reasonCode: `${command.command}_AUTHORITY_TRANSITION`,
-              summary: `${command.command} established its distinct execution and lease semantics`,
-            },
-          });
+          events.push(
+            ...(command.command === 'RESUME'
+              ? successorExecutionEvents(
+                  supervision.authority.executionId,
+                  this.dependencies.systemId,
+                )
+              : executionTransitionEvents({
+                  record,
+                  executionId: supervision.authority.executionId,
+                  fromState: fromExecution,
+                  toState: supervision.authority.executionState,
+                  systemId: this.dependencies.systemId,
+                  reasonCode: `${command.command}_AUTHORITY_TRANSITION`,
+                  summary: `${command.command} established its distinct execution and lease semantics`,
+                })),
+          );
           const response = Object.freeze({
             commandId: this.dependencies.nextId(),
             projectId: command.projectId,
@@ -1814,6 +2034,8 @@ export class SupervisionService {
             status: requiresEffectReconciliation ? transitional : terminal,
             tasks,
             capacity,
+            scheduling,
+            verification: verificationRecord,
             supervision,
             events,
             audits,
