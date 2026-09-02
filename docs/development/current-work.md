@@ -14,10 +14,10 @@
 - Public CI portability checkpoint: `2cb6852944c371af0bf7345754ec6ce779a7c8b5`
 - Public CI stability checkpoint: `569fb850657966e26512013d428fa46dba10e065`
 - Public CI browser-bootstrap checkpoint: `ca3c0bff73b5328c936bd0dd2101032f1f34dfc3`
-- Public CI green checkpoint: `56015e40eec19ecdace3dbf874b5b0dc23ad0534`
+- Public CI green checkpoint: `f9bd6e9860a48e5a56d0f8a5c22fdf1a81248987`
 - Worktree: clean after the final publication continuity checkpoint; no Feature 002 implementation
   task has started
-- Last updated: `2026-09-01T23:56:38Z`
+- Last updated: `2026-09-02T00:11:24Z`
 
 ## Completed public-repository preparation
 
@@ -54,6 +54,12 @@
   passed the clean install, Chromium bootstrap, complete validation, capacity teardown, 23 Chromium
   acceptance scenarios, and artifact upload on `main` at `56015e4`. No Dependabot pull request
   remains open; the former major-update proposals closed after the pinned workflow updates.
+- The next documentation-only run exposed the same PostgreSQL administrative-shutdown scheduling
+  window across parallel integration workers. All embedded PostgreSQL fixtures now share one strict
+  teardown that waits for every pool, accepts only `57P01` during explicit server stop, aggregates
+  all other failures, and removes its listeners. Public run
+  [`33574136239`](https://github.com/Opperiesen/moonshift/actions/runs/33574136239) passed the clean
+  install, full validation, 23 acceptance scenarios, and artifact upload on `f9bd6e9`.
 
 ## Completed lifecycle preparation
 
@@ -102,7 +108,7 @@ incomplete task.
 | JSON Schema strict compilation    | PASS   | Six Draft 2020-12 schemas compile with Ajv `strict: true` and registered UUID/date-time formats                                                                                                                         |
 | Initial OpenAPI structure         | PASS   | OpenAPI 3.1 parses and exposes only the two authenticated US1 qualification paths on the existing loopback API                                                                                                          |
 | Task structure                    | PASS   | 92 unique sequential task IDs, exact checklist syntax, dependency/user-story ordering, and T001–T035 first checkpoint                                                                                                   |
-| `pnpm clean && pnpm validate`     | PASS   | Pinned Node.js 24.20.0/pnpm 11.24.0; formatting, lint, boundaries, lockfile, image pins, secret scan, typecheck, 91 unit, 71 contract, 114 PostgreSQL integration, 33 recovery, 15 security, and 1 capacity test passed |
+| `pnpm clean && pnpm validate`     | PASS   | Pinned Node.js 24.20.0/pnpm 11.24.0; formatting, lint, boundaries, lockfile, image pins, secret scan, typecheck, 91 unit, 71 contract, 117 PostgreSQL integration, 33 recovery, 15 security, and 1 capacity test passed |
 | `pnpm test:acceptance`            | PASS   | 23 Chromium acceptance tests passed                                                                                                                                                                                     |
 | Web build                         | PASS   | Vite production build completed                                                                                                                                                                                         |
 | Generated contract check          | PASS   | `pnpm contracts:generate` produced no tracked diff                                                                                                                                                                      |
@@ -116,9 +122,9 @@ incomplete task.
 | Public CI OpenSSL portability     | PASS   | Portable fixed-date certificate generation, 55 targeted tests, full validation, and public Linux execution passed in run 33573046524                                                                                    |
 | Public CI concurrency stability   | PASS   | Stale-version race diagnosed, 10 consecutive targeted runs, full pinned validation, and public Linux execution passed in run 33573046524                                                                                |
 | Public CI browser bootstrap       | PASS   | Chromium installation precedes the capacity test inside `pnpm validate`; the capacity and acceptance phases passed in run 33573046524                                                                                   |
-| Public CI teardown stability      | PASS   | Exact shutdown-phase `57P01` handling, 10 consecutive capacity runs, two full local validations, fresh independent review, and public Ubuntu validation passed                                                          |
+| Public CI teardown stability      | PASS   | Shared exact-phase `57P01` handling, exhaustive multi-pool failure tests, 10 consecutive parallel integration runs, full local validation, fresh independent review, and public Ubuntu run 33574136239 passed           |
 | Parallel acceptance stability     | PASS   | Five isolated Vite caches; 5 consecutive cold-cache parallel runs plus the public 23-test acceptance phase passed without `Outdated Optimize Dep`                                                                       |
-| Public `main` workflow            | PASS   | Run 33573046524 completed every step successfully on `56015e40eec19ecdace3dbf874b5b0dc23ad0534`; validation artifact uploaded                                                                                           |
+| Public `main` workflow            | PASS   | Run 33574136239 completed every step successfully on `f9bd6e9860a48e5a56d0f8a5c22fdf1a81248987`; validation artifact uploaded                                                                                           |
 | Dependabot cleanup                | PASS   | Zero open pull requests after the repository-pinned current Actions generations and minor/patch update policy took effect                                                                                               |
 
 ## Open findings and bounded limitations
