@@ -7,6 +7,8 @@ import EmbeddedPostgres from 'embedded-postgres';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { stopEmbeddedPostgres } from '../fixtures/postgres.js';
+
 import { FAKE_CONNECTIONS } from '../../packages/backend-fake/src/index.js';
 import {
   type ApprovedEffectExecutor,
@@ -68,8 +70,7 @@ describe.sequential('PostgreSQL control-plane restart recovery', () => {
   }, 120_000);
 
   afterAll(async () => {
-    await pool?.end();
-    await embedded?.stop();
+    await stopEmbeddedPostgres(embedded, [pool]);
     if (databaseDirectory !== undefined)
       await rm(databaseDirectory, { recursive: true, force: true });
     if (artifactRoot !== undefined)

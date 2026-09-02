@@ -34,6 +34,7 @@ import {
 import { DEFAULT_POLICY_PROFILE } from '../../packages/policy/src/index.js';
 import { createDeterministicUuid } from '../../packages/test-fixtures/src/index.js';
 import { materializeSingleProjectCognitiveLoad } from './fixtures/single-project-cognitive-load.js';
+import { stopEmbeddedPostgres } from '../fixtures/postgres.js';
 
 async function unusedLoopbackPort(): Promise<number> {
   const server = createServer();
@@ -106,25 +107,9 @@ describe.sequential('16 GB PVE-equivalent reference capacity', () => {
     const pools = [...journeyPools.values(), sourcePool, restorePool].filter(
       (pool): pool is Pool => pool !== undefined,
     );
-    const shutdownErrors: Array<{ readonly code: unknown; readonly whileStopping: boolean }> = [];
-    let stoppingEmbedded = false;
-    const recordShutdownError = (error: Error): void => {
-      shutdownErrors.push({
-        code: 'code' in error ? error.code : undefined,
-        whileStopping: stoppingEmbedded,
-      });
-    };
-    for (const pool of pools) pool.on('error', recordShutdownError);
     try {
-      await Promise.all(pools.map(async (pool) => pool.end()));
-      stoppingEmbedded = true;
-      await embedded?.stop();
-      await new Promise<void>((resolve) => setImmediate(resolve));
-      expect(shutdownErrors).toEqual(
-        shutdownErrors.map(() => ({ code: '57P01', whileStopping: true })),
-      );
+      await stopEmbeddedPostgres(embedded, pools);
     } finally {
-      for (const pool of pools) pool.off('error', recordShutdownError);
       if (testRoot !== undefined) await rm(testRoot, { recursive: true, force: true });
     }
   }, 120_000);

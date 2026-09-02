@@ -7,6 +7,8 @@ import EmbeddedPostgres from 'embedded-postgres';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { stopEmbeddedPostgres } from '../fixtures/postgres.js';
+
 import {
   createPostgresControlPlane,
   InMemoryApprovedEffectExecutor,
@@ -66,8 +68,7 @@ describe.sequential('PostgreSQL verification persistence and compare-and-commit'
   });
 
   afterAll(async () => {
-    await pool?.end();
-    await embedded?.stop();
+    await stopEmbeddedPostgres(embedded, [pool]);
     if (databaseDirectory !== undefined)
       await rm(databaseDirectory, { recursive: true, force: true });
     if (artifactRoot !== undefined)

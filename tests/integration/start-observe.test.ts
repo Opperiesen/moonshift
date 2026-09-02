@@ -20,6 +20,8 @@ import EmbeddedPostgres from 'embedded-postgres';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { stopEmbeddedPostgres } from '../fixtures/postgres.js';
+
 async function unusedLoopbackPort(): Promise<number> {
   const server = createServer();
   await new Promise<void>((resolve, reject) => {
@@ -135,8 +137,7 @@ describe.sequential('start and observe PostgreSQL journey', () => {
   });
 
   afterAll(async () => {
-    await pool?.end();
-    await embedded?.stop();
+    await stopEmbeddedPostgres(embedded, [pool]);
     if (dataDirectory !== undefined) await rm(dataDirectory, { recursive: true, force: true });
   }, 120_000);
 

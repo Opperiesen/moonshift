@@ -9,6 +9,8 @@ import EmbeddedPostgres from 'embedded-postgres';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { stopEmbeddedPostgres } from '../fixtures/postgres.js';
+
 import {
   createPostgresControlPlane,
   SupervisionService,
@@ -199,8 +201,7 @@ describe.sequential('PostgreSQL supervised sensitive-work journey', () => {
 
   afterAll(async () => {
     await runner?.close();
-    await pool?.end();
-    await embedded?.stop();
+    await stopEmbeddedPostgres(embedded, [pool]);
     if (dataDirectory !== undefined) await rm(dataDirectory, { recursive: true, force: true });
     if (runnerDirectory !== undefined) await rm(runnerDirectory, { recursive: true, force: true });
   }, 120_000);

@@ -8,6 +8,8 @@ import EmbeddedPostgres from 'embedded-postgres';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
+import { stopEmbeddedPostgres } from '../fixtures/postgres.js';
+
 import { PostgresProjectRepository, ProjectService } from '../../apps/control-plane/src/index.js';
 import {
   recoverPostgresDeliveryState,
@@ -95,8 +97,7 @@ describe.sequential('PostgreSQL fixture backup and restore', () => {
 
   afterAll(async () => {
     await admin?.query('DROP DATABASE IF EXISTS moonshift_backup_target');
-    await admin?.end();
-    await embedded?.stop();
+    await stopEmbeddedPostgres(embedded, [admin]);
     await rm(databaseDirectory, { recursive: true, force: true });
     await rm(workspaceDirectory, { recursive: true, force: true });
   }, 120_000);
